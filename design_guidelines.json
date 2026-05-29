@@ -1,0 +1,171 @@
+{
+  "theme": "Light",
+  "archetype": "3 (Pastel & Soft) mixed with premium tactile aesthetics",
+  "colors": {
+    "primary": {
+      "DEFAULT": "#F58292",
+      "light": "#FFE4E8",
+      "dark": "#D65A6C",
+      "foreground": "#FFFFFF"
+    },
+    "secondary": {
+      "DEFAULT": "#FDD0C4",
+      "foreground": "#2D2A2B"
+    },
+    "background": "#FCFAF8",
+    "surface": "#FFFFFF",
+    "text": {
+      "primary": "#2D2A2B",
+      "secondary": "#6B6566",
+      "muted": "#A39E9F"
+    },
+    "accent": {
+      "terracotta": "#E07A5F",
+      "moss": "#81B29A",
+      "sunshine": "#F2CC8F"
+    },
+    "border": "#F0EAE8"
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Outfit, sans-serif",
+      "body": "Nunito, sans-serif"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-bold tracking-tight text-[#2D2A2B]",
+      "h2": "text-3xl font-semibold tracking-tight text-[#2D2A2B]",
+      "h3": "text-2xl font-semibold text-[#2D2A2B]",
+      "h4": "text-xl font-medium text-[#2D2A2B]",
+      "body": "text-base font-normal leading-relaxed text-[#6B6566]",
+      "caption": "text-sm font-medium text-[#A39E9F] tracking-wide uppercase"
+    }
+  },
+  "spacing": {
+    "page_padding": "p-6",
+    "section_gap": "gap-8",
+    "item_gap": "gap-4",
+    "touch_target": "min-h-[48px]"
+  },
+  "components": {
+    "card": {
+      "style": "bg-white rounded-[32px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#F0EAE8]/50",
+      "interaction": "active:scale-[0.98] transition-transform duration-200"
+    },
+    "button": {
+      "primary": "bg-[#F58292] text-white rounded-full px-8 py-4 font-semibold text-lg shadow-[0_4px_14px_0_rgba(245,130,146,0.39)] hover:bg-[#D65A6C] active:scale-95 transition-all",
+      "secondary": "bg-[#FDD0C4] text-[#2D2A2B] rounded-full px-8 py-4 font-semibold text-lg hover:bg-[#F0C0B4] active:scale-95 transition-all",
+      "outline": "border-2 border-[#F58292] text-[#F58292] rounded-full px-8 py-4 font-semibold text-lg active:scale-95 transition-all"
+    },
+    "bottom_sheet": {
+      "style": "bg-white rounded-t-[40px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]",
+      "indicator": "w-12 h-1.5 bg-[#F0EAE8] rounded-full mx-auto mt-4"
+    },
+    "input": {
+      "style": "bg-[#FCFAF8] border-2 border-[#F0EAE8] rounded-2xl px-5 py-4 text-base focus:border-[#F58292] focus:ring-4 focus:ring-[#F58292]/10 transition-all outline-none"
+    }
+  },
+  "layout_blueprints": {
+    "onboarding": {
+      "layout": "Flex-col, center-aligned. Full-screen abstract soft pink gradient background. Elegant typography.",
+      "elements": [
+        "Hero Image/Graphic: Warm polaroid style or soft abstract shape",
+        "Title: 'Daily Dose of Me'",
+        "Subtitle: 'Your private space for just the two of you.'",
+        "Primary CTA: 'Connect with Partner' (Google Auth)",
+        "Secondary CTA: 'I have an invite code'"
+      ]
+    },
+    "home_calendar": {
+      "layout": "Agenda-first layout. Sticky month grid at top, scrollable timeline/cards below.",
+      "elements": [
+        "Header: 'Days Together' counter and Couple Avatars",
+        "Calendar Grid: Clean, generous spacing. Days with memories have a solid #F58292 dot.",
+        "Timeline: List of recent memories (cards) below the calendar.",
+        "FAB (Floating Action Button): Centered or right-aligned for 'Add Memory'"
+      ]
+    },
+    "day_detail_sheet": {
+      "layout": "Bottom drawer/sheet. Draggable to expand.",
+      "elements": [
+        "Media Carousel: Large, rounded images.",
+        "Voice Note Player: Soft tactile pill shape with play button and waveform.",
+        "Caption: Up to 1500 chars, elegant serif or clean sans-serif body.",
+        "Action: 'Edit' or 'Share'"
+      ]
+    },
+    "play_dashboard": {
+      "layout": "Card-based vertical feed.",
+      "elements": [
+        "Scoreboard: Current points / Active Wager banner at the top.",
+        "Daily Question Card: Flippable or interactive card. '0 points, just for fun'.",
+        "Daily Trivia Card: Category picker, multiple choice buttons.",
+        "Weekly Challenge Card: Blurred/Hidden state. 'Drops Monday'. Reveal button."
+      ]
+    }
+  },
+  "navigation": {
+    "type": "Bottom Tab Bar",
+    "style": "bg-white/80 backdrop-blur-xl border-t border-[#F0EAE8] pb-safe pt-2 px-6 flex justify-between items-center rounded-t-3xl",
+    "tabs": [
+      {
+        "name": "Home",
+        "icon": "CalendarHeart",
+        "test_id": "tab-home"
+      },
+      {
+        "name": "Play",
+        "icon": "Gamepad2",
+        "test_id": "tab-play"
+      },
+      {
+        "name": "Capture",
+        "icon": "PlusCircle",
+        "test_id": "tab-capture",
+        "highlighted": true
+      },
+      {
+        "name": "Profile",
+        "icon": "UserHeart",
+        "test_id": "tab-profile"
+      }
+    ]
+  },
+  "icons_library": "lucide-react",
+  "media_urls": {
+    "onboarding_background": {
+      "url": "https://images.unsplash.com/photo-1605184861755-8f190fea96a5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwxfHxzb2Z0JTIwYmx1c2glMjBwaW5rJTIwYWJzdHJhY3QlMjBncmFkaWVudCUyMG9yZ2FuaWMlMjBzaGFwZXxlbnwwfHx8fDE3ODAwOTU2NDl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Soft pink and white abstract gradient for the welcome screen."
+    },
+    "couple_polaroid": {
+      "url": "https://images.pexels.com/photos/9509564/pexels-photo-9509564.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Polaroid of a couple, used as a visual element in onboarding or empty states."
+    },
+    "avatar_male": {
+      "url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwyfHxoYW5kc29tZSUyMG1hbiUyMHNtaWxpbmclMjBhdmF0YXJ8ZW58MHx8fHwxNzgwMDk1NjQwfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Partner 1 Avatar"
+    },
+    "avatar_female": {
+      "url": "https://images.unsplash.com/photo-1489278353717-f64c6ee8a4d2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxiZWF1dGlmdWwlMjB3b21hbiUyMHNtaWxpbmclMjBhdmF0YXJ8ZW58MHx8fHwxNzgwMDk1NjQ0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Partner 2 Avatar"
+    },
+    "memory_placeholder_1": {
+      "url": "https://images.unsplash.com/photo-1466979939565-131c4b39a51b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwyfHxjb3VwbGUlMjBsYXVnaGluZyUyMHdhcm0lMjBwb2xhcm9pZCUyMHN0eWxlfGVufDB8fHx8MTc4MDA5NTYzM3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Couple laughing, use as placeholder in media vault/day detail."
+    },
+    "memory_placeholder_2": {
+      "url": "https://images.pexels.com/photos/16341254/pexels-photo-16341254.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Joyful couple in forest setting, use as placeholder in media vault."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Design specifically for a mobile web experience (viewport constraints, max width 480px if viewed on desktop, large touch targets >44px, hidden scrollbars).",
+    "Use 'Outfit' font for all headings, and 'Nunito' for body text. Make sure these are properly imported via Google Fonts.",
+    "The Home dashboard should prioritize the Month Grid. Do not overcomplicate the grid; use a simple minimal solid dot under days that have memory entries.",
+    "Implement the 'Day Detail Sheet' as a Bottom Drawer (using Vaul or Shadcn Drawer) that slides up from the bottom when a date on the calendar is tapped.",
+    "For the 'Add Memory' action, trigger a full-screen modal or another drawer with large, tactile inputs for media, voice note recording (emulated UI), and a text area for captions.",
+    "In the 'Play' tab, create distinct card styles for Daily Question, Daily Trivia, and Weekly Challenge. Use soft shadows and rounded-3xl borders to make them feel touchable and premium.",
+    "Ensure the weekly challenge card has a 'locked/blurred' state if viewed before Monday, or a clear 'Accept/Decline' interface.",
+    "All interactive elements must have a `data-testid` attribute (e.g., `data-testid=\"btn-accept-challenge\"`).",
+    "Do NOT use pure black/white for text and backgrounds. Stick strictly to the defined custom color palette. Everything must feel warm and inviting."
+  ]
+}
