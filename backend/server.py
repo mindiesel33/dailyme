@@ -431,12 +431,17 @@ async def daily_question(user: Dict[str, Any] = Depends(get_current_user)):
         {"couple_id": couple["couple_id"], "date": d, "question_id": q["question_id"]}, {"_id": 0}
     )
     answers = doc.get("answers", {}) if doc else {}
+    my_answer = answers.get(user["user_id"])
+    # Privacy: hide partner's answer until the viewer has answered.
+    visible = answers if my_answer is not None else {
+        k: v for k, v in answers.items() if k == user["user_id"]
+    }
     return {
         "date": d,
         "question_id": q["question_id"],
         "question": q["text"],
-        "answers": answers,
-        "my_answer": answers.get(user["user_id"]),
+        "answers": visible,
+        "my_answer": my_answer,
     }
 
 
