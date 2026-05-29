@@ -1,22 +1,28 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "Daily Dose of Me",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "scheme": "dailydoseofme",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Capture date-night photos for your memories",
+        "NSPhotoLibraryUsageDescription": "Add photos from your gallery to memories",
+        "NSMicrophoneUsageDescription": "Record voice notes for your memories"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#F58292"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": ["CAMERA", "RECORD_AUDIO", "READ_MEDIA_IMAGES"]
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +40,8 @@
           "backgroundColor": "#000"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

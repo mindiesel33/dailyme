@@ -1,0 +1,65 @@
+{
+  "summary": "Ran 37 backend pytest cases against the deployed API. All 37 passed (100%). Coverage: auth (valid/missing/invalid/malformed/expired token), couple create/join (fresh, idempotent, invalid code, full couple, case-insensitive code, already-linked), couple settings + days_together math, memories validation (>5 photos rejected, 1500-char caption truncation, 60s voice cap, only-author delete, month filter, by-date), Daily Question determinism + persistence, Daily Trivia (real DeepSeek/OpenRouter call, 4 options, chooser, idempotent per day, hidden correct_index until answer, +1 point, no double-answer), Weekly Challenge (auto-generate pending, decline path, cannot complete before accept, +5 points + partner_revealed after completion), Weekly Wager (propose, proposer cannot self-accept, partner accept, decline-then-new-wager allowed, 300-char stake cap, 404 when none), and end-to-end points aggregation (A=6 after correct trivia + completed challenge, B=0). Identified ONE real PRD-violation bug via direct curl: GET /api/daily/question leaks the partner's answer text in the `answers` map even before the viewer has answered (PRD says partner answers must be hidden until you answer).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/daily/question",
+        "issue": "Privacy leak: the response field `answers` returns ALL partner answers verbatim even when the current user has NOT yet answered (`my_answer: null`). PRD explicitly says partner answers must be hidden until you answer. Reproduced via curl: B posts \"B_SECRET_ANSWER\", A's GET returns `answers: {user_test_bbb2: \"B_SECRET_ANSWER\"}, my_answer: null`. Fix: in server.py `daily_question()` and `answer_daily_question()`, only include partner entries in `answers` after the current user has answered, or replace partner values with a sentinel (e.g. \"\u2014\" / `null` / `\"hidden\"`).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/couple/create",
+        "issue": "`gen_invite_code()` produces 6-char codes with no retry on unique-index collision. Although extremely rare (32^6), an unhandled duplicate would surface as a 500. Consider a retry loop on DuplicateKeyError."
+      },
+      {
+        "endpoint": "GET /api/memories",
+        "issue": "Hard limit of 500 documents returned with no pagination. Acceptable for MVP but should be revisited as memories accrue."
+      },
+      {
+        "endpoint": "POST /api/daily/trivia/generate",
+        "issue": "Fallback path (when OpenRouter fails or returns malformed JSON) always uses the same Mars question. If LLM hiccups, both partners see the identical canned question. Suggest rotating a fallback bank similar to CHALLENGE_FALLBACKS."
+      },
+      {
+        "endpoint": "POST /api/couple/join",
+        "issue": "When the SAME user re-submits a code for a couple they are already a member of, the endpoint silently returns 200 with the serialized couple instead of the documented 400 \"already linked\". Behavior is harmless but inconsistent with the error message defined elsewhere."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backend.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix daily-question partner-answer leak: in server.py `daily_question()` (GET) and `answer_daily_question()` (POST), strip partner entries from the returned `answers` dict whenever the current user's answer is missing. Return only `{user_id: text}` for the caller, or replace others with `null`/hidden until both have answered.",
+    "(Optional) Add DuplicateKeyError retry to `couple_create` invite-code generation.",
+    "(Optional) Expand trivia fallback bank to avoid identical Mars question when OpenRouter fails."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 757 lines; consider splitting into routers/modules (auth, couple, memories, daily, weekly) once stable.",
+    "`daily_question` returns full `answers` dict without gating on viewer-has-answered \u2014 PRD violation (see HIGH issue above).",
+    "`_id` correctly excluded everywhere via `{\"_id\": 0}` projections; serialization helpers also clean.",
+    "Async/await usage on Motor is correct throughout; no sync blocking calls in handlers.",
+    "All env vars (MONGO_URL, DB_NAME, OPENROUTER_API_KEY) read from os.environ; no hardcoded URLs.",
+    "Pydantic models validate every request body; HTTPException codes (400/401/404) are semantically correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/__init__.py (new)",
+    "/app/backend/tests/conftest.py (new)",
+    "/app/backend/tests/test_backend.py (new)"
+  ],
+  "success_rate": {"backend": "100% (37/37)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Ran /app/backend/seed_test.py to (re)seed partner.a@test.com (token testtoken_partner_a) and partner.b@test.com (token testtoken_partner_b). Tests then clean couple/memories/trivia/challenges/wagers/question_answers collections per fixture and re-link the seeded users for happy-path flows.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Test suite lives at /app/backend/tests/. Run with: `cd /app/backend && python -m pytest tests/ -v --junitxml=/app/test_reports/pytest/pytest_results.xml`. The `linked_couple` fixture wipes couple-dependent collections then creates+joins a fresh couple for each test using it \u2014 so tests can mutate state freely. BASE_URL resolves from EXPO_BACKEND_URL, falling back to EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env. Trivia tests make real OpenRouter calls (one per generate test, ~3 calls total, ~3-5s each).",
+  "rca_of_issue": "PRD says: 'Daily Question \u2026 partner answer hidden until you answer'. In server.py the `daily_question` GET handler unconditionally returns `answers: doc.get('answers', {})` (line ~433) and `answer_daily_question` POST returns the same. There is no filter by `user[\"user_id\"]`. Repro: (1) B POST /api/daily/question/answer {\"answer\":\"B_SECRET\"}. (2) A GET /api/daily/question \u2192 response includes `{\"answers\": {\"user_test_bbb2\": \"B_SECRET\"}, \"my_answer\": null}`. Mitigation: before returning, replace partner entries with a hidden sentinel when `answers.get(user['user_id'])` is None, e.g.:\n\n    both_answered = len(answers) >= 2\n    if not both_answered:\n        answers = {k: v for k, v in answers.items() if k == user['user_id']}\n\nApply identical guard in `answer_daily_question` response."
+}
