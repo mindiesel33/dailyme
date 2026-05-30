@@ -1,0 +1,51 @@
+{
+  "summary": "Bilingual (EN + es-MX) test pass. Backend: 42/42 pytest cases green (37 prior regression + 5 new i18n). New i18n cases verify: GET /api/daily/question?lang=es returns Spanish text with the SAME question_id as ?lang=en; /api/daily/trivia/categories?lang=es returns {key,label} with Spanish labels (Movies & TV -> 'Cine y TV', Geography -> 'Geografía', Music -> 'Música'); POST /api/daily/trivia/generate {category:'Geography', lang:'es'} stores a single bilingual doc (question_en/_es + options_en/_es + shared correct_index), and per-viewer GET returns Spanish to A (?lang=es) and English to B (?lang=en) with translated category label; GET /api/weekly/challenge?lang=es returns a Spanish challenge_text (LLM via OpenRouter). All prior regression flows (couple link, memories CRUD, daily question deterministic, trivia +1, weekly challenge accept->complete +5 + partner_revealed, wager propose->accept) still pass. Frontend: web preview at https://dose-journal-2.preview.emergentagent.com DEFINITIVELY renders the login screen at 375x667 — heart badge, 'Daily Dose of Me' title, English 'just the two of us' / 'Continue with Google' under default (en) navigator locale, and Spanish 'solo nosotros dos' / 'Continuar con Google' after switching navigator.language to es-MX and clearing localStorage. testIDs login-screen and google-signin-btn are present and visible. ZERO console errors, ZERO pageerror events, no React Native red-box. The 'Premature close' tunnel messages in expo.err.log are unrelated to client rendering — they are intermittent metro tunnel chatter and do not affect served HTML/JS. Only non-issues observed in console are React Native Web 'shadow*' style deprecation warnings (cosmetic; not blocking).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/daily/trivia/generate (fallback)",
+        "issue": "When OpenRouter returns malformed JSON, fallback inserts the SAME hardcoded Mars question in both EN+ES. Acceptable but could rotate from a bilingual fallback bank (carried over from iteration 1)."
+      },
+      {
+        "endpoint": "GET /api/daily/question",
+        "issue": "Carry-over from iteration 1: `answers` dict is returned unfiltered. Per the suite's prior finding, partner's answer is visible before viewer answers — PRD says it should be hidden. The i18n change does not alter this. Not exercised again here; please confirm main agent's fix on the previous report."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "all", "issues": ["React Native Web 'shadow*' style props deprecation warnings flood the console — non-blocking but should be migrated to boxShadow on web or wrapped in Platform.select to silence noise."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backend.py",
+    "/app/backend/tests/test_i18n.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking for the i18n release. The web app renders correctly in both English and Spanish, backend bilingual endpoints are correct, and all 42 backend tests pass.",
+    "(Carry-over from iteration 1) Still fix partner-answer leak in /api/daily/question — strip partner entries from `answers` until viewer has answered.",
+    "(Optional polish) Migrate React Native shadow* styles to boxShadow on web to silence deprecation warnings."
+  ],
+  "critical_code_review_comments": [
+    "i18n implementation is clean: src/i18n.tsx exposes useI18n() with t()/setLang()/ready, detects locale via expo-localization.getLocales(), persists via storage with key 'ddom_lang', and is wrapped at the root in _layout.tsx.",
+    "Backend uses parallel catalogs (DAILY_QUESTIONS / DAILY_QUESTIONS_ES same index, CATEGORY_LABELS map, CHALLENGE_FALLBACKS / CHALLENGE_FALLBACKS_ES) and a single bilingual trivia doc keyed by question_en/_es + options_en/_es with one shared correct_index — correct design that avoids drift.",
+    "Splash gate timeout fallback in _layout.tsx (2.5s) is the right resilience measure; the page rendered well before timeout (no blank screen reproduced).",
+    "All bilingual endpoints accept ?lang= and normalize via norm_lang() — robust against e.g. 'es-MX' input."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_i18n.py (new)",
+    "/app/test_reports/iteration_2.json (this)"
+  ],
+  "success_rate": {"backend": "100% (42/42)", "frontend": "100% (login renders in EN and ES, no console errors)"},
+  "seed_data_creation": "Re-ran /app/backend/seed_test.py to ensure partner.a/partner.b sessions are seeded. The linked_couple fixture continues to wipe couples/memories/trivia/challenges/wagers/question_answers per test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: `cd /app/backend && python -m pytest tests/ -v --junitxml=/app/test_reports/pytest/pytest_results.xml`. i18n-specific tests live in /app/backend/tests/test_i18n.py. Frontend i18n was verified by overriding navigator.language with an init script (es-MX) and clearing localStorage before reload to bypass the persisted 'ddom_lang'. The 'blank screenshot' the main agent saw was a flaky tunnel/screenshot artifact — login screen renders correctly end-to-end.",
+  "rca_of_issue": "Main-agent's worry was a possible blank-screen runtime bug. Reproduction attempt FAILED — the login screen renders with full content (heart badge, title, subtitle, Google button, terms) in both English and Spanish, with zero console JS errors and zero pageerror events. Only console output is RN-Web shadow* deprecation warnings + the dev-mode React DevTools tip. The 'Premature close' lines in expo.err.log are metro tunnel reconnects, not client errors — the HTML/JS bundle served to the browser is healthy. The 2.5s splash-gate fallback in _layout.tsx is in place and ready was reached well before timeout. Conclusion: no real runtime blank-screen bug; the blank screenshots were tooling/tunnel flakes."
+}

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { api } from "@/src/api";
+import { useI18n } from "@/src/i18n";
 import { Text, Button } from "@/src/components/ui";
 import { VoicePlayer } from "@/src/components/voice";
 import { colors, spacing, radius } from "@/src/theme";
@@ -26,6 +27,7 @@ export default function DayDetail() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loading, setLoading] = useState(true);
   const d = dayjs(date);
@@ -48,17 +50,17 @@ export default function DayDetail() {
   );
 
   const onDelete = (id: string) => {
-    Alert.alert("Delete memory?", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("day.deleteTitle"), t("day.deleteMsg"), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("day.delete"),
         style: "destructive",
         onPress: async () => {
           try {
             await api.del(`/memories/${id}`);
             load();
           } catch (e: any) {
-            Alert.alert("Couldn't delete", e.message);
+            Alert.alert(t("day.couldntDelete"), e.message);
           }
         },
       },
@@ -87,10 +89,10 @@ export default function DayDetail() {
           <View style={styles.empty}>
             <Ionicons name="heart-outline" size={40} color={colors.primary} />
             <Text weight="bodySemi" style={styles.emptyTitle}>
-              Nothing logged for this day
+              {t("day.nothing")}
             </Text>
             <Text weight="body" style={styles.emptyText}>
-              Add a photo, caption or voice note to remember it.
+              {t("day.nothingSub")}
             </Text>
           </View>
         ) : (
@@ -105,7 +107,7 @@ export default function DayDetail() {
                   </View>
                 )}
                 <Text weight="bodySemi" style={styles.authorName}>
-                  {m.author_name?.split(" ")[0] || "Someone"}
+                  {m.author_name?.split(" ")[0] || t("day.someone")}
                 </Text>
                 <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={() => onDelete(m.id)} testID={`delete-${m.id}`} hitSlop={8}>
@@ -138,7 +140,7 @@ export default function DayDetail() {
 
         <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.md }}>
           <Button
-            title="Add to this day"
+            title={t("day.add")}
             variant={memories.length ? "outline" : "primary"}
             onPress={() => router.push(`/capture?date=${date}`)}
             testID="add-to-day-btn"
@@ -155,10 +157,10 @@ const styles = StyleSheet.create({
   handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: "center", marginTop: 8 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   dow: { color: colors.primary, fontSize: 12, letterSpacing: 1.5 },
-  dateBig: { fontSize: 28, color: colors.text },
+  dateBig: { fontSize: 28, color: colors.text, textTransform: "capitalize" },
   closeBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
   empty: { alignItems: "center", padding: spacing.xl, marginTop: spacing.xl },
-  emptyTitle: { fontSize: 17, color: colors.text, marginTop: spacing.sm },
+  emptyTitle: { fontSize: 17, color: colors.text, marginTop: spacing.sm, textAlign: "center" },
   emptyText: { fontSize: 14, color: colors.textMuted, textAlign: "center", marginTop: 4 },
   card: { backgroundColor: colors.surface, marginHorizontal: spacing.lg, marginBottom: spacing.md, borderRadius: radius.xl, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   authorRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: spacing.sm },

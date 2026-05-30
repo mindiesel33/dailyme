@@ -6,30 +6,34 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { useI18n } from "@/src/i18n";
 import { Text, Button, Card } from "@/src/components/ui";
 import { colors, fonts, spacing, radius } from "@/src/theme";
+
+type Category = { key: string; label: string };
 
 export default function Play() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const [loading, setLoading] = useState(true);
   const [question, setQuestion] = useState<any>(null);
   const [trivia, setTrivia] = useState<any>(null);
   const [challenge, setChallenge] = useState<any>(null);
   const [wager, setWager] = useState<any>(null);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [q, t, ch, w, cats] = await Promise.all([
-        api.get("/daily/question"),
-        api.get("/daily/trivia"),
-        api.get("/weekly/challenge"),
+      const [q, tr, ch, w, cats] = await Promise.all([
+        api.get(`/daily/question?lang=${lang}`),
+        api.get(`/daily/trivia?lang=${lang}`),
+        api.get(`/weekly/challenge?lang=${lang}`),
         api.get("/weekly/wager"),
-        api.get("/daily/trivia/categories"),
+        api.get(`/daily/trivia/categories?lang=${lang}`),
       ]);
       setQuestion(q);
-      setTrivia(t);
+      setTrivia(tr);
       setChallenge(ch);
       setWager(w.wager);
       setCategories(cats.categories);
@@ -38,7 +42,7 @@ export default function Play() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lang]);
 
   useFocusEffect(
     useCallback(() => {
@@ -62,28 +66,27 @@ export default function Play() {
       showsVerticalScrollIndicator={false}
     >
       <Text weight="heading" style={styles.title}>
-        Play together
+        {t("play.title")}
       </Text>
       <Text weight="body" style={styles.subtitle}>
-        A little game of us, every day.
+        {t("play.subtitle")}
       </Text>
 
-      <WagerCard wager={wager} userId={user?.user_id} reload={load} />
-      <QuestionCard question={question} userId={user?.user_id} reload={load} />
-      <TriviaCard trivia={trivia} categories={categories} userId={user?.user_id} reload={load} />
-      <ChallengeCard challenge={challenge} reload={load} />
+      <WagerCard wager={wager} userId={user?.user_id} reload={load} t={t} />
+      <QuestionCard question={question} userId={user?.user_id} reload={load} t={t} lang={lang} />
+      <TriviaCard trivia={trivia} categories={categories} reload={load} t={t} lang={lang} />
+      <ChallengeCard challenge={challenge} reload={load} t={t} lang={lang} />
     </KeyboardAwareScrollView>
   );
 }
 
-// ---------------- Wager ----------------
-function WagerCard({ wager, userId, reload }: any) {
+function WagerCard({ wager, userId, reload, t }: any) {
   const [stake, setStake] = useState("");
   const [busy, setBusy] = useState(false);
 
   const propose = async () => {
     if (stake.trim().length < 3) {
-      Alert.alert("Set a stake", "Type what the loser owes this week.");
+      Alert.alert(t("play.setStake"), t("play.setStakeMsg"));
       return;
     }
     setBusy(true);
@@ -92,7 +95,7 @@ function WagerCard({ wager, userId, reload }: any) {
       setStake("");
       reload();
     } catch (e: any) {
-      Alert.alert("Couldn't propose", e.message);
+      Alert.alert(t("play.couldntPropose"), e.message);
     } finally {
       setBusy(false);
     }
@@ -104,7 +107,7 @@ function WagerCard({ wager, userId, reload }: any) {
       await api.post(`/weekly/wager/${action}`);
       reload();
     } catch (e: any) {
-      Alert.alert("Oops", e.message);
+      Alert.alert(t("common.oops"), e.message);
     } finally {
       setBusy(false);
     }
@@ -116,12 +119,12 @@ function WagerCard({ wager, userId, reload }: any) {
         <View style={styles.rowGap}>
           <Ionicons name="trophy" size={18} color={colors.sunshine} />
           <Text weight="bodyBold" style={{ color: "#fff", fontSize: 16 }}>
-            This week's wager
+            {t("play.wagerTitle")}
           </Text>
         </View>
         <View style={styles.weekTag}>
           <Text weight="bodySemi" style={{ color: colors.sunshine, fontSize: 11 }}>
-            MON–SUN
+            {t("play.monSun")}
           </Text>
         </View>
       </View>
@@ -129,17 +132,17 @@ function WagerCard({ wager, userId, reload }: any) {
       {!wager || wager.status === "declined" ? (
         <View style={{ marginTop: spacing.md }}>
           <Text weight="body" style={styles.wagerHint}>
-            No wager yet — propose one, or play for bragging rights.
+            {t("play.noWager")}
           </Text>
           <TextInput
             value={stake}
             onChangeText={setStake}
-            placeholder="e.g. Loser buys Sunday brunch"
+            placeholder={t("play.wagerPlaceholder")}
             placeholderTextColor="rgba(255,255,255,0.4)"
             style={styles.wagerInput}
             testID="wager-input"
           />
-          <Button title="Propose wager" onPress={propose} loading={busy} testID="propose-wager-btn" style={{ marginTop: spacing.sm }} />
+          <Button title={t("play.proposeWager")} onPress={propose} loading={busy} testID="propose-wager-btn" style={{ marginTop: spacing.sm }} />
         </View>
       ) : wager.status === "pending" ? (
         <View style={{ marginTop: spacing.md }}>
@@ -148,14 +151,14 @@ function WagerCard({ wager, userId, reload }: any) {
           </Text>
           {wager.can_respond ? (
             <View style={styles.rowGap}>
-              <Button title="Accept" onPress={() => respond("accept")} loading={busy} testID="accept-wager-btn" style={{ flex: 1 }} />
-              <Button title="Decline" variant="secondary" onPress={() => respond("decline")} testID="decline-wager-btn" style={{ flex: 1 }} />
+              <Button title={t("play.accept")} onPress={() => respond("accept")} loading={busy} testID="accept-wager-btn" style={{ flex: 1 }} />
+              <Button title={t("play.decline")} variant="secondary" onPress={() => respond("decline")} testID="decline-wager-btn" style={{ flex: 1 }} />
             </View>
           ) : (
             <View style={styles.rowGap}>
               <Ionicons name="hourglass-outline" size={16} color="rgba(255,255,255,0.7)" />
               <Text weight="body" style={{ color: "rgba(255,255,255,0.7)" }}>
-                Waiting for your partner to accept…
+                {t("play.waitingAccept")}
               </Text>
             </View>
           )}
@@ -165,7 +168,7 @@ function WagerCard({ wager, userId, reload }: any) {
           <View style={[styles.rowGap, { marginBottom: 4 }]}>
             <Ionicons name="checkmark-circle" size={16} color={colors.moss} />
             <Text weight="bodySemi" style={{ color: colors.moss }}>
-              Wager on!
+              {t("play.wagerOn")}
             </Text>
           </View>
           <Text weight="bodySemi" style={styles.wagerStake}>
@@ -177,8 +180,7 @@ function WagerCard({ wager, userId, reload }: any) {
   );
 }
 
-// ---------------- Daily Question ----------------
-function QuestionCard({ question, userId, reload }: any) {
+function QuestionCard({ question, userId, reload, t, lang }: any) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   if (!question) return null;
@@ -191,11 +193,11 @@ function QuestionCard({ question, userId, reload }: any) {
     if (text.trim().length < 1) return;
     setBusy(true);
     try {
-      await api.post("/daily/question/answer", { answer: text.trim() });
+      await api.post(`/daily/question/answer?lang=${lang}`, { answer: text.trim() });
       setText("");
       reload();
     } catch (e: any) {
-      Alert.alert("Oops", e.message);
+      Alert.alert(t("common.oops"), e.message);
     } finally {
       setBusy(false);
     }
@@ -207,11 +209,11 @@ function QuestionCard({ question, userId, reload }: any) {
         <View style={styles.rowGap}>
           <Ionicons name="chatbubble-ellipses" size={18} color={colors.terracotta} />
           <Text weight="bodyBold" style={styles.cardKicker}>
-            Daily question
+            {t("play.dailyQuestion")}
           </Text>
         </View>
         <Text weight="body" style={styles.justForFun}>
-          just for fun
+          {t("play.justForFun")}
         </Text>
       </View>
       <Text weight="headingSemi" style={styles.questionText}>
@@ -221,7 +223,7 @@ function QuestionCard({ question, userId, reload }: any) {
       {myAnswer ? (
         <View style={styles.answerBlock}>
           <Text weight="caption" style={styles.answerLabel}>
-            YOU
+            {t("play.you")}
           </Text>
           <Text weight="body" style={styles.answerText}>
             {myAnswer}
@@ -232,7 +234,7 @@ function QuestionCard({ question, userId, reload }: any) {
           <TextInput
             value={text}
             onChangeText={setText}
-            placeholder="Type your answer…"
+            placeholder={t("play.answerPlaceholder")}
             placeholderTextColor={colors.textMuted}
             style={styles.qInput}
             testID="question-input"
@@ -246,10 +248,10 @@ function QuestionCard({ question, userId, reload }: any) {
       {partnerId && (
         <View style={[styles.answerBlock, { backgroundColor: colors.background }]}>
           <Text weight="caption" style={styles.answerLabel}>
-            PARTNER
+            {t("play.partner")}
           </Text>
           <Text weight="body" style={styles.answerText}>
-            {myAnswer ? answers[partnerId] : "🙈 Answer first to reveal"}
+            {myAnswer ? answers[partnerId] : t("play.answerToReveal")}
           </Text>
         </View>
       )}
@@ -257,19 +259,18 @@ function QuestionCard({ question, userId, reload }: any) {
   );
 }
 
-// ---------------- Daily Trivia ----------------
-function TriviaCard({ trivia, categories, userId, reload }: any) {
+function TriviaCard({ trivia, categories, reload, t, lang }: any) {
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
 
-  const generate = async (cat: string) => {
+  const generate = async (catKey: string) => {
     setBusy(true);
-    setPicked(cat);
+    setPicked(catKey);
     try {
-      await api.post("/daily/trivia/generate", { category: cat });
+      await api.post("/daily/trivia/generate", { category: catKey, lang });
       reload();
     } catch (e: any) {
-      Alert.alert("Couldn't load trivia", e.message);
+      Alert.alert(t("play.couldntTrivia"), e.message);
     } finally {
       setBusy(false);
     }
@@ -278,10 +279,10 @@ function TriviaCard({ trivia, categories, userId, reload }: any) {
   const answer = async (idx: number) => {
     setBusy(true);
     try {
-      await api.post("/daily/trivia/answer", { choice_index: idx });
+      await api.post(`/daily/trivia/answer?lang=${lang}`, { choice_index: idx });
       reload();
     } catch (e: any) {
-      Alert.alert("Oops", e.message);
+      Alert.alert(t("common.oops"), e.message);
     } finally {
       setBusy(false);
     }
@@ -293,12 +294,12 @@ function TriviaCard({ trivia, categories, userId, reload }: any) {
         <View style={styles.rowGap}>
           <Ionicons name="bulb" size={18} color={colors.sunshine} />
           <Text weight="bodyBold" style={styles.cardKicker}>
-            Daily trivia
+            {t("play.dailyTrivia")}
           </Text>
         </View>
         <View style={styles.pointTag}>
           <Text weight="bodySemi" style={{ color: colors.primaryDark, fontSize: 11 }}>
-            +1 PT
+            {t("play.pt1")}
           </Text>
         </View>
       </View>
@@ -306,19 +307,19 @@ function TriviaCard({ trivia, categories, userId, reload }: any) {
       {!trivia?.exists ? (
         <View style={{ marginTop: spacing.sm }}>
           <Text weight="body" style={styles.triviaHint}>
-            Pick a category to start today's round:
+            {t("play.pickCategory")}
           </Text>
           <View style={styles.catWrap}>
-            {categories.map((c: string) => (
+            {categories.map((c: Category) => (
               <TouchableOpacity
-                key={c}
-                style={[styles.catChip, picked === c && busy && { opacity: 0.5 }]}
-                onPress={() => generate(c)}
+                key={c.key}
+                style={[styles.catChip, picked === c.key && busy && { opacity: 0.5 }]}
+                onPress={() => generate(c.key)}
                 disabled={busy}
-                testID={`trivia-cat-${c}`}
+                testID={`trivia-cat-${c.key}`}
               >
                 <Text weight="bodySemi" style={styles.catText}>
-                  {c}
+                  {c.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -369,7 +370,7 @@ function TriviaCard({ trivia, categories, userId, reload }: any) {
           })}
           {trivia.my_answer != null && (
             <Text weight="bodySemi" style={styles.triviaResult}>
-              {trivia.my_answer.correct ? "Nailed it! +1 point 🎉" : "Not quite — better luck tomorrow!"}
+              {trivia.my_answer.correct ? t("play.triviaCorrect") : t("play.triviaWrong")}
             </Text>
           )}
         </View>
@@ -378,8 +379,7 @@ function TriviaCard({ trivia, categories, userId, reload }: any) {
   );
 }
 
-// ---------------- Weekly Challenge ----------------
-function ChallengeCard({ challenge, reload }: any) {
+function ChallengeCard({ challenge, reload, t, lang }: any) {
   const [busy, setBusy] = useState(false);
   if (!challenge) return null;
   const mine = challenge.mine;
@@ -387,10 +387,10 @@ function ChallengeCard({ challenge, reload }: any) {
   const act = async (action: "accept" | "decline" | "complete") => {
     setBusy(true);
     try {
-      await api.post(`/weekly/challenge/${action}`);
+      await api.post(`/weekly/challenge/${action}?lang=${lang}`);
       reload();
     } catch (e: any) {
-      Alert.alert("Oops", e.message);
+      Alert.alert(t("common.oops"), e.message);
     } finally {
       setBusy(false);
     }
@@ -402,17 +402,17 @@ function ChallengeCard({ challenge, reload }: any) {
         <View style={styles.rowGap}>
           <Ionicons name="gift" size={18} color={colors.primaryDark} />
           <Text weight="bodyBold" style={[styles.cardKicker, { color: colors.primaryDark }]}>
-            Weekly secret mission
+            {t("play.mission")}
           </Text>
         </View>
         <View style={[styles.pointTag, { backgroundColor: "#fff" }]}>
           <Text weight="bodySemi" style={{ color: colors.primaryDark, fontSize: 11 }}>
-            +5 PTS
+            {t("play.pts5")}
           </Text>
         </View>
       </View>
       <Text weight="body" style={styles.challengeSub}>
-        Drops every Monday · hidden from your partner until you pull it off 🤫
+        {t("play.missionSub")}
       </Text>
 
       <View style={styles.challengeBox}>
@@ -423,18 +423,18 @@ function ChallengeCard({ challenge, reload }: any) {
 
       {mine.status === "pending" && (
         <View style={styles.rowGap}>
-          <Button title="Accept mission" onPress={() => act("accept")} loading={busy} testID="accept-challenge-btn" style={{ flex: 1 }} />
-          <Button title="Skip" variant="outline" onPress={() => act("decline")} testID="decline-challenge-btn" style={{ flex: 1 }} />
+          <Button title={t("play.acceptMission")} onPress={() => act("accept")} loading={busy} testID="accept-challenge-btn" style={{ flex: 1 }} />
+          <Button title={t("play.skip")} variant="outline" onPress={() => act("decline")} testID="decline-challenge-btn" style={{ flex: 1 }} />
         </View>
       )}
       {mine.status === "accepted" && (
-        <Button title="Mark as done (+5)" onPress={() => act("complete")} loading={busy} testID="complete-challenge-btn" icon={<Ionicons name="checkmark" size={18} color="#fff" />} />
+        <Button title={t("play.markDone")} onPress={() => act("complete")} loading={busy} testID="complete-challenge-btn" icon={<Ionicons name="checkmark" size={18} color="#fff" />} />
       )}
       {mine.status === "completed" && (
         <View style={styles.statusBanner}>
           <Ionicons name="checkmark-circle" size={18} color={colors.moss} />
           <Text weight="bodySemi" style={{ color: colors.moss }}>
-            Mission complete! +5 points
+            {t("play.missionComplete")}
           </Text>
         </View>
       )}
@@ -442,17 +442,16 @@ function ChallengeCard({ challenge, reload }: any) {
         <View style={styles.statusBanner}>
           <Ionicons name="close-circle" size={18} color={colors.textMuted} />
           <Text weight="bodySemi" style={{ color: colors.textMuted }}>
-            Skipped this week
+            {t("play.skipped")}
           </Text>
         </View>
       )}
 
-      {/* Partner reveal */}
       <View style={styles.partnerReveal}>
         {challenge.partner_revealed ? (
           <>
             <Text weight="caption" style={{ color: colors.primaryDark, letterSpacing: 1 }}>
-              YOUR PARTNER SECRETLY DID
+              {t("play.partnerDid")}
             </Text>
             <Text weight="body" style={styles.revealText} testID="partner-revealed">
               {challenge.partner_revealed.challenge_text}
@@ -462,7 +461,7 @@ function ChallengeCard({ challenge, reload }: any) {
           <View style={styles.rowGap}>
             <Ionicons name="eye-off-outline" size={16} color={colors.textMuted} />
             <Text weight="body" style={{ color: colors.textMuted, fontSize: 13, flex: 1 }}>
-              Your partner has their own secret mission this week…
+              {t("play.partnerSecret")}
             </Text>
           </View>
         )}

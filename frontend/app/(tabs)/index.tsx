@@ -6,12 +6,12 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { useI18n } from "@/src/i18n";
 import { Text } from "@/src/components/ui";
 import { colors, fonts, spacing, radius, shadow } from "@/src/theme";
 
 const { width } = Dimensions.get("window");
 const CELL = (width - spacing.lg * 2 - 12) / 7;
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 type Member = { user_id: string; name?: string; picture?: string; points: number };
 type Memory = { id: string; date: string; media: string[]; caption: string; voice_note?: string; author_name?: string };
@@ -20,6 +20,7 @@ export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [couple, setCouple] = useState<any>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [month, setMonth] = useState(dayjs());
@@ -52,6 +53,7 @@ export default function Home() {
   };
 
   const datesWithMemories = new Set(memories.map((m) => m.date));
+  const weekdays = [0, 1, 2, 3, 4, 5, 6].map((i) => dayjs().day(i).format("dd").charAt(0));
 
   const startOfMonth = month.startOf("month");
   const daysInMonth = month.daysInMonth();
@@ -65,9 +67,7 @@ export default function Home() {
   const partner = members.find((m) => m.user_id !== user?.user_id);
   const totalPoints = members.reduce((s, m) => s + (m.points || 0), 0);
 
-  const goToDay = (d: dayjs.Dayjs) => {
-    router.push(`/day/${d.format("YYYY-MM-DD")}`);
-  };
+  const goToDay = (d: dayjs.Dayjs) => router.push(`/day/${d.format("YYYY-MM-DD")}`);
 
   return (
     <ScrollView
@@ -76,7 +76,6 @@ export default function Home() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text weight="body" style={styles.hello}>
@@ -89,14 +88,13 @@ export default function Home() {
         <View style={styles.pointsPill} testID="total-points">
           <Ionicons name="sparkles" size={14} color={colors.primaryDark} />
           <Text weight="bodyBold" style={styles.pointsText}>
-            {totalPoints} pts
+            {t("home.pts", { n: totalPoints })}
           </Text>
         </View>
       </View>
 
-      {/* Couple bar */}
       <View style={styles.coupleBar}>
-        <Avatar member={me} fallback="You" highlight />
+        <Avatar member={me} fallback={t("common.you")} highlight />
         <View style={styles.daysCenter}>
           <Ionicons name="heart" size={20} color={colors.primary} />
           {couple?.days_together != null ? (
@@ -105,21 +103,20 @@ export default function Home() {
                 {couple.days_together}
               </Text>
               <Text weight="body" style={styles.daysLabel}>
-                days together
+                {t("home.daysTogether")}
               </Text>
             </>
           ) : (
             <TouchableOpacity onPress={() => router.push("/(tabs)/profile")} testID="set-anniversary-link">
               <Text weight="bodySemi" style={styles.setAnni}>
-                Set your anniversary
+                {t("home.setAnniversary")}
               </Text>
             </TouchableOpacity>
           )}
         </View>
-        <Avatar member={partner} fallback="Partner" />
+        <Avatar member={partner} fallback={t("common.partner")} />
       </View>
 
-      {/* Calendar */}
       <View style={styles.calCard}>
         <View style={styles.calHeader}>
           <TouchableOpacity onPress={() => setMonth(month.subtract(1, "month"))} testID="prev-month" hitSlop={10}>
@@ -134,10 +131,10 @@ export default function Home() {
         </View>
 
         <View style={styles.weekRow}>
-          {WEEKDAYS.map((w, i) => (
+          {weekdays.map((w, i) => (
             <View key={i} style={{ width: CELL, alignItems: "center" }}>
               <Text weight="bodySemi" style={styles.weekday}>
-                {w}
+                {w.toUpperCase()}
               </Text>
             </View>
           ))}
@@ -167,13 +164,12 @@ export default function Home() {
         </View>
       </View>
 
-      {/* Timeline */}
       <View style={styles.timelineHeader}>
         <Text weight="headingSemi" style={styles.sectionTitle}>
-          Our memories
+          {t("home.ourMemories")}
         </Text>
         <Text weight="body" style={styles.sectionCount}>
-          {memories.length} this month
+          {t("home.thisMonth", { n: memories.length })}
         </Text>
       </View>
 
@@ -181,10 +177,10 @@ export default function Home() {
         <TouchableOpacity style={styles.empty} onPress={() => router.push("/capture")} testID="empty-add-memory">
           <Ionicons name="camera-outline" size={32} color={colors.primary} />
           <Text weight="bodySemi" style={styles.emptyTitle}>
-            No memories yet this month
+            {t("home.noMemories")}
           </Text>
           <Text weight="body" style={styles.emptyText}>
-            Tap the + to capture your first date night.
+            {t("home.noMemoriesSub")}
           </Text>
         </TouchableOpacity>
       ) : (
@@ -202,7 +198,7 @@ export default function Home() {
                 {dayjs(m.date).format("ddd, MMM D")}
               </Text>
               <Text weight="body" style={styles.memCaption} numberOfLines={2}>
-                {m.caption || (m.voice_note ? "Voice note 🎙️" : "A moment together")}
+                {m.caption || (m.voice_note ? t("home.voiceNote") : t("home.aMoment"))}
               </Text>
               <View style={styles.memMeta}>
                 {m.media?.length > 1 && (
@@ -244,7 +240,7 @@ function Avatar({ member, fallback, highlight }: { member?: Member; fallback: st
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.lg },
-  hello: { color: colors.textMuted, fontSize: 13 },
+  hello: { color: colors.textMuted, fontSize: 13, textTransform: "capitalize" },
   brand: { fontSize: 24, color: colors.text, letterSpacing: -0.5 },
   pointsPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.primaryLight, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
   pointsText: { color: colors.primaryDark, fontSize: 14 },
@@ -257,10 +253,10 @@ const styles = StyleSheet.create({
   daysCenter: { alignItems: "center", flex: 1 },
   daysNum: { fontSize: 30, color: colors.text, lineHeight: 34 },
   daysLabel: { fontSize: 12, color: colors.textMuted },
-  setAnni: { color: colors.primary, fontSize: 13, marginTop: 4 },
+  setAnni: { color: colors.primary, fontSize: 13, marginTop: 4, textAlign: "center" },
   calCard: { backgroundColor: colors.surface, marginHorizontal: spacing.lg, marginTop: spacing.lg, borderRadius: radius.xl, padding: spacing.md, borderWidth: 1, borderColor: colors.border, ...shadow.card },
   calHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, marginBottom: spacing.sm },
-  calMonth: { fontSize: 17, color: colors.text },
+  calMonth: { fontSize: 17, color: colors.text, textTransform: "capitalize" },
   weekRow: { flexDirection: "row", marginBottom: 4 },
   weekday: { fontSize: 12, color: colors.textMuted },
   grid: { flexDirection: "row", flexWrap: "wrap" },
@@ -272,12 +268,12 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, color: colors.text },
   sectionCount: { color: colors.textMuted, fontSize: 13 },
   empty: { marginHorizontal: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.xl, alignItems: "center", borderWidth: 1, borderColor: colors.border, borderStyle: "dashed" },
-  emptyTitle: { color: colors.text, fontSize: 16, marginTop: spacing.sm },
+  emptyTitle: { color: colors.text, fontSize: 16, marginTop: spacing.sm, textAlign: "center" },
   emptyText: { color: colors.textMuted, fontSize: 14, textAlign: "center", marginTop: 4 },
   memCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface, marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderRadius: radius.lg, padding: spacing.sm, borderWidth: 1, borderColor: colors.border },
   memThumb: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.primaryLight },
   memThumbEmpty: { alignItems: "center", justifyContent: "center" },
-  memDate: { color: colors.text, fontSize: 15 },
+  memDate: { color: colors.text, fontSize: 15, textTransform: "capitalize" },
   memCaption: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   memMeta: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 },
   metaTag: { flexDirection: "row", alignItems: "center", gap: 3 },

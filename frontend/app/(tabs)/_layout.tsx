@@ -5,12 +5,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
 import { Text } from "@/src/components/ui";
+import { useI18n } from "@/src/i18n";
 import { colors, fonts, shadow } from "@/src/theme";
 
 const TABS = [
-  { name: "index", label: "Home", icon: "calendar" as const },
-  { name: "play", label: "Play", icon: "game-controller" as const },
-  { name: "profile", label: "Us", icon: "heart" as const },
+  { name: "index", labelKey: "tab.home", icon: "calendar" as const },
+  { name: "play", labelKey: "tab.play", icon: "game-controller" as const },
+  { name: "profile", labelKey: "tab.us", icon: "heart" as const },
 ];
 
 function CustomTabBar({ state, navigation }: any) {
@@ -43,6 +44,7 @@ function CustomTabBar({ state, navigation }: any) {
 }
 
 function TabItem({ tab, state, navigation }: any) {
+  const { t } = useI18n();
   const route = state.routes.find((r: any) => r.name === tab.name);
   const index = state.routes.indexOf(route);
   const focused = state.index === index;
@@ -51,10 +53,10 @@ function TabItem({ tab, state, navigation }: any) {
     if (!focused && !event.defaultPrevented) navigation.navigate(tab.name);
   };
   return (
-    <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.7} testID={`tab-${tab.label.toLowerCase()}`}>
+    <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.7} testID={`tab-${tab.name}`}>
       <Ionicons name={focused ? tab.icon : (`${tab.icon}-outline` as any)} size={24} color={focused ? colors.primary : colors.textMuted} />
       <Text style={[styles.label, { color: focused ? colors.primary : colors.textMuted, fontFamily: focused ? fonts.bodyBold : fonts.body }]}>
-        {tab.label}
+        {t(tab.labelKey)}
       </Text>
     </TouchableOpacity>
   );

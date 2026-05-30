@@ -15,7 +15,18 @@ import uuid
 from datetime import datetime, timezone, timedelta, date
 import httpx
 
-from content import DAILY_QUESTIONS, TRIVIA_CATEGORIES, CHALLENGE_FALLBACKS
+from content import (
+    DAILY_QUESTIONS,
+    DAILY_QUESTIONS_ES,
+    TRIVIA_CATEGORIES,
+    CATEGORY_LABELS,
+    CHALLENGE_FALLBACKS,
+    CHALLENGE_FALLBACKS_ES,
+)
+
+
+def norm_lang(lang: Optional[str]) -> str:
+    return "es" if (lang or "en").lower().startswith("es") else "en"
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -142,6 +153,7 @@ class AnswerQuestionRequest(BaseModel):
 
 class GenerateTriviaRequest(BaseModel):
     category: str
+    lang: Optional[str] = "en"
 
 
 class AnswerTriviaRequest(BaseModel):
@@ -415,18 +427,19 @@ async def delete_memory(mem_id: str, user: Dict[str, Any] = Depends(get_current_
 
 # ----------------------------- Daily Question ---------------------------------
 
-def question_for_date(d: str) -> Dict[str, Any]:
-    # deterministic question per date
+def question_for_date(d: str, lang: str = "en") -> Dict[str, Any]:
+    # deterministic question per date; same index across languages
     ordinal = datetime.strptime(d, "%Y-%m-%d").date().toordinal()
     idx = ordinal % len(DAILY_QUESTIONS)
-    return {"question_id": f"q_{idx}", "text": DAILY_QUESTIONS[idx]}
+    bank = DAILY_QUESTIONS_ES if norm_lang(lang) == "es" else DAILY_QUESTIONS
+    return {"question_id": f"q_{idx}", "text": bank[idx]}
 
 
 @api_router.get("/daily/question")
-async def daily_question(user: Dict[str, Any] = Depends(get_current_user)):
+async def daily_question(lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
     couple = require_couple(await get_my_couple(user))
     d = today_str()
-    q = question_for_date(d)
+    q = question_for_date(d, lang)
     doc = await db.question_answers.find_one(
         {"couple_id": couple["couple_id"], "date": d, "question_id": q["question_id"]}, {"_id": 0}
     )
@@ -446,10 +459,10 @@ async def daily_question(user: Dict[str, Any] = Depends(get_current_user)):
 
 
 @api_router.post("/daily/question/answer")
-async def answer_daily_question(req: AnswerQuestionRequest, user: Dict[str, Any] = Depends(get_current_user)):
+async def answer_daily_question(req: AnswerQuestionRequest, lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
     couple = require_couple(await get_my_couple(user))
     d = today_str()
-    q = question_for_date(d)
+    q = question_for_date(d, lang)
     await db.question_answers.update_one(
         {"couple_id": couple["couple_id"], "date": d, "question_id": q["question_id"]},
         {"$set": {f"answers.{user['user_id']}": req.answer[:500], "updated_at": now_utc()},
@@ -465,30 +478,37 @@ async def answer_daily_question(req: AnswerQuestionRequest, user: Dict[str, Any]
 # ----------------------------- Daily Trivia -----------------------------------
 
 @api_router.get("/daily/trivia/categories")
-async def trivia_categories(user: Dict[str, Any] = Depends(get_current_user)):
-    return {"categories": TRIVIA_CATEGORIES}
+async def trivia_categories(lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
+    lg = norm_lang(lang)
+    return {"categories": [{"key": k, "label": CATEGORY_LABELS[k][lg]} for k in TRIVIA_CATEGORIES]}
 
 
 @api_router.get("/daily/trivia")
-async def get_daily_trivia(user: Dict[str, Any] = Depends(get_current_user)):
+async def get_daily_trivia(lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
     couple = require_couple(await get_my_couple(user))
     d = today_str()
     doc = await db.trivia.find_one({"couple_id": couple["couple_id"], "date": d}, {"_id": 0})
     if not doc:
         return {"exists": False, "date": d}
-    return _trivia_public(doc, user["user_id"])
+    return _trivia_public(doc, user["user_id"], lang)
 
 
-def _trivia_public(doc: Dict[str, Any], uid: str) -> Dict[str, Any]:
+def _trivia_public(doc: Dict[str, Any], uid: str, lang: str = "en") -> Dict[str, Any]:
+    lg = norm_lang(lang)
     answers = doc.get("answers", {})
     my = answers.get(uid)
     both_answered = len(answers) >= 2
+    # Bilingual fields stored as question_en/_es + options_en/_es. Fall back to legacy keys.
+    question = doc.get(f"question_{lg}") or doc.get("question")
+    options = doc.get(f"options_{lg}") or doc.get("options")
+    cat = doc.get("category")
+    category = CATEGORY_LABELS.get(cat, {}).get(lg, cat)
     return {
         "exists": True,
         "date": doc["date"],
-        "category": doc["category"],
-        "question": doc["question"],
-        "options": doc["options"],
+        "category": category,
+        "question": question,
+        "options": options,
         "chooser_id": doc.get("chooser_id"),
         "my_answer": my,  # {choice_index, correct}
         "answers": answers,
@@ -501,47 +521,58 @@ def _trivia_public(doc: Dict[str, Any], uid: str) -> Dict[str, Any]:
 @api_router.post("/daily/trivia/generate")
 async def generate_trivia(req: GenerateTriviaRequest, user: Dict[str, Any] = Depends(get_current_user)):
     couple = require_couple(await get_my_couple(user))
+    lang = norm_lang(req.lang)
     d = today_str()
     existing = await db.trivia.find_one({"couple_id": couple["couple_id"], "date": d}, {"_id": 0})
     if existing:
-        return _trivia_public(existing, user["user_id"])
+        return _trivia_public(existing, user["user_id"], lang)
 
     category = req.category if req.category in TRIVIA_CATEGORIES else random.choice(TRIVIA_CATEGORIES)
     system = (
         "You are a fun trivia master for a couples game. Generate ONE multiple-choice trivia "
-        "question. Return STRICT JSON only with keys: question (string), options (array of exactly 4 "
-        "short strings), correct_index (integer 0-3). No commentary, no markdown."
+        "question in BOTH English and Mexican Spanish. Return STRICT JSON only with keys: "
+        "question_en (string), options_en (array of exactly 4 short strings), "
+        "question_es (string, Mexican Spanish), options_es (array of exactly 4 short strings, "
+        "Mexican Spanish, same order/meaning as options_en), correct_index (integer 0-3). "
+        "No commentary, no markdown."
     )
     user_prompt = f"Category: {category}. Make it fun and of moderate difficulty. JSON only."
-    text = await call_openrouter(system, user_prompt, max_tokens=400)
+    text = await call_openrouter(system, user_prompt, max_tokens=600)
     parsed = extract_json(text) if text else None
 
-    if not parsed or "options" not in parsed or len(parsed.get("options", [])) != 4:
-        # fallback question
+    valid = (
+        parsed
+        and len(parsed.get("options_en", []) or []) == 4
+        and len(parsed.get("options_es", []) or []) == 4
+    )
+    if not valid:
         parsed = {
-            "question": f"({category}) Which planet is known as the Red Planet?",
-            "options": ["Venus", "Mars", "Jupiter", "Saturn"],
+            "question_en": "Which planet is known as the Red Planet?",
+            "options_en": ["Venus", "Mars", "Jupiter", "Saturn"],
+            "question_es": "¿Qué planeta es conocido como el Planeta Rojo?",
+            "options_es": ["Venus", "Marte", "Júpiter", "Saturno"],
             "correct_index": 1,
         }
-        category = parsed.get("category", category)
 
     doc = {
         "couple_id": couple["couple_id"],
         "date": d,
         "category": category,
         "chooser_id": user["user_id"],
-        "question": str(parsed["question"]),
-        "options": [str(o) for o in parsed["options"]][:4],
+        "question_en": str(parsed["question_en"]),
+        "options_en": [str(o) for o in parsed["options_en"]][:4],
+        "question_es": str(parsed["question_es"]),
+        "options_es": [str(o) for o in parsed["options_es"]][:4],
         "correct_index": int(parsed["correct_index"]) % 4,
         "answers": {},
         "created_at": now_utc(),
     }
     await db.trivia.insert_one(doc)
-    return _trivia_public(doc, user["user_id"])
+    return _trivia_public(doc, user["user_id"], lang)
 
 
 @api_router.post("/daily/trivia/answer")
-async def answer_trivia(req: AnswerTriviaRequest, user: Dict[str, Any] = Depends(get_current_user)):
+async def answer_trivia(req: AnswerTriviaRequest, lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
     couple = require_couple(await get_my_couple(user))
     d = today_str()
     doc = await db.trivia.find_one({"couple_id": couple["couple_id"], "date": d})
@@ -559,27 +590,39 @@ async def answer_trivia(req: AnswerTriviaRequest, user: Dict[str, Any] = Depends
             {"$inc": {f"points.{user['user_id']}": 1}},
         )
     fresh = await db.trivia.find_one({"couple_id": couple["couple_id"], "date": d}, {"_id": 0})
-    return _trivia_public(fresh, user["user_id"])
+    return _trivia_public(fresh, user["user_id"], lang)
 
 
 # ----------------------------- Weekly Challenge -------------------------------
 
-async def generate_challenge_text() -> str:
-    system = (
-        "You generate ONE short, playful, wholesome real-world challenge for someone to secretly "
-        "do for their romantic partner this week. Keep it to a single sentence, actionable, sweet "
-        "or harmlessly goofy. Return only the sentence, no quotes, no markdown."
-    )
-    text = await call_openrouter(system, "Give me one new weekly couple challenge.", max_tokens=120)
+async def generate_challenge_text(lang: str = "en") -> str:
+    lg = norm_lang(lang)
+    if lg == "es":
+        system = (
+            "Genera UN reto corto, juguetón y sano del mundo real para que alguien lo haga en "
+            "secreto por su pareja esta semana. Una sola oración, accionable, tierno o chistoso "
+            "de forma inofensiva. Usa español mexicano. Devuelve solo la oración, sin comillas ni markdown."
+        )
+        prompt = "Dame un nuevo reto semanal de pareja."
+        fallbacks = CHALLENGE_FALLBACKS_ES
+    else:
+        system = (
+            "You generate ONE short, playful, wholesome real-world challenge for someone to secretly "
+            "do for their romantic partner this week. Keep it to a single sentence, actionable, sweet "
+            "or harmlessly goofy. Return only the sentence, no quotes, no markdown."
+        )
+        prompt = "Give me one new weekly couple challenge."
+        fallbacks = CHALLENGE_FALLBACKS
+    text = await call_openrouter(system, prompt, max_tokens=160)
     if text:
         text = text.strip().strip('"').split("\n")[0]
         if 10 < len(text) < 240:
             return text
-    return random.choice(CHALLENGE_FALLBACKS)
+    return random.choice(fallbacks)
 
 
 @api_router.get("/weekly/challenge")
-async def get_weekly_challenge(user: Dict[str, Any] = Depends(get_current_user)):
+async def get_weekly_challenge(lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
     """Returns the current user's private weekly challenge (drops Monday). Auto-generates if missing.
     Also returns the partner's challenge ONLY if it has been completed (revealed)."""
     couple = require_couple(await get_my_couple(user))
@@ -590,7 +633,7 @@ async def get_weekly_challenge(user: Dict[str, Any] = Depends(get_current_user))
         {"couple_id": couple["couple_id"], "user_id": uid, "week_start": week}, {"_id": 0}
     )
     if not mine:
-        text = await generate_challenge_text()
+        text = await generate_challenge_text(lang)
         mine = {
             "id": gen_id("ch"),
             "couple_id": couple["couple_id"],
@@ -627,7 +670,7 @@ async def get_weekly_challenge(user: Dict[str, Any] = Depends(get_current_user))
 
 
 @api_router.post("/weekly/challenge/{action}")
-async def act_weekly_challenge(action: str, user: Dict[str, Any] = Depends(get_current_user)):
+async def act_weekly_challenge(action: str, lang: str = "en", user: Dict[str, Any] = Depends(get_current_user)):
     if action not in {"accept", "decline", "complete"}:
         raise HTTPException(status_code=400, detail="Invalid action")
     couple = require_couple(await get_my_couple(user))
@@ -651,7 +694,7 @@ async def act_weekly_challenge(action: str, user: Dict[str, Any] = Depends(get_c
         await db.couples.update_one(
             {"couple_id": couple["couple_id"]}, {"$inc": {f"points.{uid}": 5}}
         )
-    return await get_weekly_challenge(user)
+    return await get_weekly_challenge(lang, user)
 
 
 # ----------------------------- Weekly Wager -----------------------------------

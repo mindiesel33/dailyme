@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -19,6 +19,7 @@ import {
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider } from "@/src/auth";
+import { I18nProvider } from "@/src/i18n";
 import { colors } from "@/src/theme";
 
 SplashScreen.preventAutoHideAsync();
@@ -34,7 +35,13 @@ export default function RootLayout() {
     Nunito_700Bold,
   });
 
-  const ready = (iconsLoaded || iconErr) && fontsLoaded;
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setTimedOut(true), 2500);
+    return () => clearTimeout(id);
+  }, []);
+
+  const ready = ((iconsLoaded || iconErr) && fontsLoaded) || timedOut;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -47,16 +54,18 @@ export default function RootLayout() {
       <KeyboardProvider>
         <SafeAreaProvider>
           <AuthProvider>
-            <StatusBar style="dark" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.background },
-              }}
-            >
-              <Stack.Screen name="capture" options={{ presentation: "modal" }} />
-              <Stack.Screen name="day/[date]" options={{ presentation: "modal" }} />
-            </Stack>
+            <I18nProvider>
+              <StatusBar style="dark" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.background },
+                }}
+              >
+                <Stack.Screen name="capture" options={{ presentation: "modal" }} />
+                <Stack.Screen name="day/[date]" options={{ presentation: "modal" }} />
+              </Stack>
+            </I18nProvider>
           </AuthProvider>
         </SafeAreaProvider>
       </KeyboardProvider>

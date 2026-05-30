@@ -1,15 +1,9 @@
 """
-Static content for Daily Dose of Me.
+Static + localized content for Daily Dose of Me (English + Mexican Spanish).
 
-DAILY_QUESTIONS: A curated, "forward-looking filtered" set of lighthearted couple
-questions. Every question has been cleaned to reference the current couple's shared
-journey ("we"/"us"/"our") and to strip out any backward-looking individual history
-(exes, past partners, etc.) per the PRD's moderation rule.
-
-TRIVIA_CATEGORIES: Categories a partner can choose for the Daily Trivia round.
-
-CHALLENGE_FALLBACKS: Used if the AI generator is unavailable. Real-world, playful,
-honor-system tasks one partner secretly performs for the other.
+DAILY_QUESTIONS / DAILY_QUESTIONS_ES: parallel arrays (same index = same question).
+TRIVIA_CATEGORIES: canonical keys; CATEGORY_LABELS maps key -> {en, es}.
+CHALLENGE_FALLBACKS / _ES: used if the AI generator is unavailable.
 """
 
 DAILY_QUESTIONS = [
@@ -75,6 +69,69 @@ DAILY_QUESTIONS = [
     "What's the funniest thing that's ever happened to the two of us?",
 ]
 
+DAILY_QUESTIONS_ES = [
+    "Si fuéramos un dúo de animales que hablan, ¿qué especie sería cada quien y qué cosa molesta diríamos?",
+    "¿Cuál sería nuestro negocito ridículo y cuál sería nuestro eslogan?",
+    "Si fuéramos supervillanos, ¿cuáles serían nuestros nombres de villanos?",
+    "¿En qué reality show arrasaríamos como pareja?",
+    "Si intercambiáramos cuerpos por 24 horas, ¿qué es lo primero que harías?",
+    "¿Cuál sería nuestro disfraz de pareja si lo hiciéramos bien barato?",
+    "Si empezara un apocalipsis zombie ahorita, ¿quién de los dos sobrevive más y por qué?",
+    "Si pudiéramos cambiar de vida con cualquier pareja ficticia, ¿quiénes serían?",
+    "¿Cuál es un talento completamente inútil del que estás raramente orgulloso/a?",
+    "Si nuestra relación tuviera una canción, ¿cuál sería?",
+    "¿Quién es la cucharita chica y quién la grande en esta casa?",
+    "Si nos perdiéramos juntos en un viaje, ¿quién entra en pánico primero?",
+    "Si me describieras a un dibujante de retratos, ¿qué dirías?",
+    "¿Quién ganaría en una batalla de baile entre nosotros dos?",
+    "¿Cuál es mi manía más molesta que en secreto te parece tierna?",
+    "Si nuestra relación fuera una torta, ¿de qué sería?",
+    "¿Quién tarda más en arreglarse cuando salimos?",
+    "Si ambos fuéramos coches, ¿qué tipo de coches seríamos?",
+    "¿Qué crees que piensa de nosotros nuestra mascota (o la futura)?",
+    "¿Quién es más chillón/a cuando se enferma?",
+    "¿Cuál es una canción que amas en secreto pero nunca admites?",
+    "¿Cuál es tu pedido de comida rápida cuando estás muerto/a de cansancio?",
+    "¿Qué película puedes ver una y otra vez pero finges que odias?",
+    "¿Qué pequeña molestia te enoja sin razón?",
+    "¿Cuál es tu antojo más raro de medianoche?",
+    "¿Qué emoji usas de más cuando me escribes?",
+    "¿Tienes un chiste de papá clásico? A ver, cuéntalo.",
+    "¿Cuál es una combinación de comida que amas y a todos les da asco?",
+    "¿Amanecer o atardecer para nuestra cita perfecta?",
+    "¿Desayuno dulce o salado en la cama?",
+    "¿Preferirías que viajáramos en máquina del tiempo o por teletransportación?",
+    "¿Leer mentes por una hora o ser invisible por un día?",
+    "Si abriéramos un restaurante temático, ¿qué serviría y cómo se vería?",
+    "Si tuviéramos una casota, ¿cuál es el cuarto inútil que sí o sí tendríamos?",
+    "¿Preferirías quedarnos en casa en cada cita o salir en cada cita?",
+    "¿Preferirías un solo pasatiempo juntos de por vida o nunca repetir la misma actividad?",
+    "¿Preferirías que yo fuera súper romántico/a o súper práctico/a?",
+    "¿Preferirías una pareja que da buenos regalos o buenos cumplidos?",
+    "¿Preferirías cocinar cada noche mientras yo lavo, o al revés?",
+    "¿Preferirías sentirte siempre comprendido/a o siempre valorado/a?",
+    "¿Preferirías más dinero pero menos tiempo juntos, o menos dinero y más tiempo juntos?",
+    "¿Preferirías besarnos bajo la lluvia o bajo las estrellas?",
+    "¿Preferirías planear una cita sorpresa para mí o que yo la planee para ti?",
+    "¿Preferirías recibir flores frescas de sorpresa o tus botanas favoritas?",
+    "¿Preferirías celebrar aniversarios con una cita elaborada o un regalo pequeño y significativo?",
+    "¿Preferirías una sesión de fotos de pareja o una pintura personalizada de nosotros?",
+    "¿Preferirías un mensaje coqueto cada mañana o una llamada coqueta cada noche?",
+    "¿Cuál fue tu primera impresión de mí?",
+    "¿Cuál crees que es mi rasgo más sexy?",
+    "¿Cómo te hago sentir cuando te miro desde el otro lado del cuarto?",
+    "¿Qué hago sin querer que te encanta?",
+    "¿Cuál es tu tipo de caricia casual favorita de mi parte?",
+    "Describe tu día romántico perfecto y sin interrupciones conmigo.",
+    "¿Cómo te sientes con las muestras de cariño en público conmigo?",
+    "¿Cuál es el recuerdo más juguetón que tienes de nosotros hasta ahora?",
+    "¿Cuál es una frase cursi para ligar que siempre te haría sonrojar o reír?",
+    "¿Cuál es el cumplido más bonito que te he dado?",
+    "¿Cuál es tu aroma favorito en mí?",
+    "¿Cuál es tu forma favorita de empezar una noche acogedora juntos?",
+    "¿Qué es lo más chistoso que nos ha pasado a los dos?",
+]
+
 TRIVIA_CATEGORIES = [
     "General Knowledge",
     "Movies & TV",
@@ -88,6 +145,19 @@ TRIVIA_CATEGORIES = [
     "Pop Culture",
 ]
 
+CATEGORY_LABELS = {
+    "General Knowledge": {"en": "General Knowledge", "es": "Cultura general"},
+    "Movies & TV": {"en": "Movies & TV", "es": "Cine y TV"},
+    "Music": {"en": "Music", "es": "Música"},
+    "Food & Drink": {"en": "Food & Drink", "es": "Comida y bebida"},
+    "Geography": {"en": "Geography", "es": "Geografía"},
+    "Science": {"en": "Science", "es": "Ciencia"},
+    "History": {"en": "History", "es": "Historia"},
+    "Sports": {"en": "Sports", "es": "Deportes"},
+    "Animals": {"en": "Animals", "es": "Animales"},
+    "Pop Culture": {"en": "Pop Culture", "es": "Cultura pop"},
+}
+
 CHALLENGE_FALLBACKS = [
     "Hide a little love note somewhere your partner will only find it 2 days from now.",
     "Secretly pick out your partner's outfit for one day this week.",
@@ -99,4 +169,17 @@ CHALLENGE_FALLBACKS = [
     "Give your partner an unprompted 30-second shoulder rub at the most random moment.",
     "Write down 3 tiny things they did this week that made you smile and read them aloud.",
     "Plan a surprise walk or drive to somewhere new, even if it's just around the block.",
+]
+
+CHALLENGE_FALLBACKS_ES = [
+    "Esconde una notita de amor donde tu pareja la encuentre apenas en 2 días.",
+    "En secreto, escoge el outfit de tu pareja para un día de esta semana.",
+    "Planea una 'cita' sorpresa de 20 minutos en casa (botanas + una canción) y sorpréndele.",
+    "Manda una nota de voz o mensaje a una hora random solo para decir algo que adoras de él/ella.",
+    "Recrea la botana o bebida de una de sus primeras citas y sorpréndele.",
+    "Haz una tarea de la casa que tu pareja odia, sin decir ni una palabra.",
+    "Toma una foto espontánea de un momento bonito esta semana y agrégala a sus recuerdos.",
+    "Dale a tu pareja un masaje de hombros de 30 segundos en el momento más random.",
+    "Escribe 3 cositas que hizo esta semana que te sacaron una sonrisa y léeselas en voz alta.",
+    "Planea una caminata o paseo sorpresa a un lugar nuevo, aunque sea a la vuelta de la esquina.",
 ]

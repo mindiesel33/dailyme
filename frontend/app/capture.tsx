@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import dayjs from "dayjs";
 import { api } from "@/src/api";
+import { useI18n } from "@/src/i18n";
 import { Text, Button } from "@/src/components/ui";
 import { VoiceRecorder } from "@/src/components/voice";
 import { colors, fonts, spacing, radius } from "@/src/theme";
@@ -17,6 +18,7 @@ const MAX_CAPTION = 1500;
 export default function Capture() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ date?: string }>();
   const initialDate = params.date && dayjs(params.date).isValid() ? dayjs(params.date) : dayjs();
 
@@ -28,7 +30,7 @@ export default function Capture() {
 
   const pickImages = async () => {
     if (media.length >= MAX_PHOTOS) {
-      Alert.alert("Up to 5 photos", "You've reached the limit for this memory.");
+      Alert.alert(t("cap.limitTitle"), t("cap.limitMsg"));
       return;
     }
     const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -80,9 +82,9 @@ export default function Capture() {
   };
 
   const openSettings = () => {
-    Alert.alert("Permission needed", "Enable photo access in Settings to add photos.", [
-      { text: "Not now", style: "cancel" },
-      { text: "Open Settings", onPress: () => Linking.openSettings() },
+    Alert.alert(t("cap.permTitle"), t("cap.permMsg"), [
+      { text: t("common.notNow"), style: "cancel" },
+      { text: t("common.openSettings"), onPress: () => Linking.openSettings() },
     ]);
   };
 
@@ -90,7 +92,7 @@ export default function Capture() {
 
   const save = async () => {
     if (media.length === 0 && !caption.trim() && !voice.uri) {
-      Alert.alert("Add something sweet", "Add a photo, a caption, or a voice note first.");
+      Alert.alert(t("cap.addSomething"), t("cap.addSomethingMsg"));
       return;
     }
     setSaving(true);
@@ -104,7 +106,7 @@ export default function Capture() {
       });
       router.back();
     } catch (e: any) {
-      Alert.alert("Couldn't save", e.message || "Please try again.");
+      Alert.alert(t("cap.couldntSave"), e.message || t("common.tryAgain"));
     } finally {
       setSaving(false);
     }
@@ -117,15 +119,14 @@ export default function Capture() {
           <Ionicons name="close" size={26} color={colors.text} />
         </TouchableOpacity>
         <Text weight="headingSemi" style={styles.topTitle}>
-          New memory
+          {t("cap.title")}
         </Text>
         <View style={{ width: 26 }} />
       </View>
 
       <KeyboardAwareScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }} bottomOffset={20}>
-        {/* Date chips */}
         <Text weight="caption" style={styles.label}>
-          WHEN
+          {t("cap.when")}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.lg }}>
           <View style={{ flexDirection: "row", gap: 8 }}>
@@ -140,7 +141,7 @@ export default function Capture() {
                   testID={`date-chip-${d.format("YYYY-MM-DD")}`}
                 >
                   <Text weight="body" style={[styles.dateChipDay, active && { color: "#fff" }]}>
-                    {i === 0 ? "Today" : d.format("ddd")}
+                    {i === 0 ? t("cap.today") : d.format("ddd")}
                   </Text>
                   <Text weight="bodyBold" style={[styles.dateChipNum, active && { color: "#fff" }]}>
                     {d.format("D")}
@@ -151,9 +152,8 @@ export default function Capture() {
           </View>
         </ScrollView>
 
-        {/* Photos */}
         <Text weight="caption" style={styles.label}>
-          PHOTOS ({media.length}/{MAX_PHOTOS})
+          {t("cap.photos", { n: media.length, max: MAX_PHOTOS })}
         </Text>
         <View style={styles.photoGrid}>
           {media.map((uri, i) => (
@@ -169,14 +169,14 @@ export default function Capture() {
               <TouchableOpacity style={styles.addPhoto} onPress={pickImages} testID="pick-photos-btn">
                 <Ionicons name="images-outline" size={24} color={colors.primary} />
                 <Text weight="body" style={styles.addPhotoText}>
-                  Library
+                  {t("cap.library")}
                 </Text>
               </TouchableOpacity>
               {Platform.OS !== "web" && (
                 <TouchableOpacity style={styles.addPhoto} onPress={takePhoto} testID="take-photo-btn">
                   <Ionicons name="camera-outline" size={24} color={colors.primary} />
                   <Text weight="body" style={styles.addPhotoText}>
-                    Camera
+                    {t("cap.camera")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -184,27 +184,25 @@ export default function Capture() {
           )}
         </View>
 
-        {/* Caption */}
         <Text weight="caption" style={[styles.label, { marginTop: spacing.lg }]}>
-          CAPTION ({caption.length}/{MAX_CAPTION})
+          {t("cap.caption", { n: caption.length, max: MAX_CAPTION })}
         </Text>
         <TextInput
           value={caption}
-          onChangeText={(t) => setCaption(t.slice(0, MAX_CAPTION))}
-          placeholder="What made today special?"
+          onChangeText={(t2) => setCaption(t2.slice(0, MAX_CAPTION))}
+          placeholder={t("cap.captionPlaceholder")}
           placeholderTextColor={colors.textMuted}
           multiline
           style={styles.caption}
           testID="caption-input"
         />
 
-        {/* Voice */}
         <Text weight="caption" style={[styles.label, { marginTop: spacing.lg }]}>
-          VOICE NOTE
+          {t("cap.voiceNote")}
         </Text>
         <VoiceRecorder onChange={(uri, dur) => setVoice({ uri, dur })} />
 
-        <Button title="Save memory" onPress={save} loading={saving} testID="save-memory-btn" style={{ marginTop: spacing.xl }} />
+        <Button title={t("cap.save")} onPress={save} loading={saving} testID="save-memory-btn" style={{ marginTop: spacing.xl }} />
       </KeyboardAwareScrollView>
     </View>
   );
@@ -217,7 +215,7 @@ const styles = StyleSheet.create({
   label: { color: colors.textMuted, fontSize: 12, letterSpacing: 1, marginBottom: spacing.sm },
   dateChip: { width: 60, paddingVertical: 10, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center" },
   dateChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dateChipDay: { fontSize: 12, color: colors.textMuted },
+  dateChipDay: { fontSize: 12, color: colors.textMuted, textTransform: "capitalize" },
   dateChipNum: { fontSize: 18, color: colors.text },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   photoWrap: { position: "relative" },

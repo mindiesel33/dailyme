@@ -13,6 +13,7 @@ import {
 import { File, Paths } from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "@/src/components/ui";
+import { useI18n } from "@/src/i18n";
 import { colors, radius, spacing } from "@/src/theme";
 
 const MAX_SECONDS = 60;
@@ -31,6 +32,7 @@ export function VoiceRecorder({
 }) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const state = useAudioRecorderState(recorder);
+  const { t } = useI18n();
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordedDataUri, setRecordedDataUri] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
@@ -60,11 +62,11 @@ export function VoiceRecorder({
 
   const promptSettings = () => {
     Alert.alert(
-      "Microphone access needed",
-      "Enable microphone access to record a voice note for your memory.",
+      t("voice.micTitle"),
+      t("voice.micMsg"),
       [
-        { text: "Not now", style: "cancel" },
-        { text: "Open Settings", onPress: () => Linking.openSettings() },
+        { text: t("common.notNow"), style: "cancel" },
+        { text: t("common.openSettings"), onPress: () => Linking.openSettings() },
       ]
     );
   };
@@ -77,7 +79,7 @@ export function VoiceRecorder({
       await recorder.prepareToRecordAsync();
       recorder.record();
     } catch (e) {
-      Alert.alert("Couldn't start recording", "Please try again.");
+      Alert.alert(t("voice.couldntStart"), t("common.tryAgain"));
     }
   };
 
@@ -95,7 +97,7 @@ export function VoiceRecorder({
         onChange(dataUri, dur || 1);
       }
     } catch (e) {
-      Alert.alert("Couldn't save recording", "Please try again.");
+      Alert.alert(t("voice.couldntSave"), t("common.tryAgain"));
     }
   };
 
@@ -122,7 +124,7 @@ export function VoiceRecorder({
       <View style={styles.webNote}>
         <Ionicons name="mic-off-outline" size={18} color={colors.textMuted} />
         <Text weight="body" style={styles.webNoteText}>
-          Voice notes record best on the phone app.
+          {t("voice.web")}
         </Text>
       </View>
     );
@@ -140,10 +142,10 @@ export function VoiceRecorder({
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
         <Text weight="bodySemi" style={{ color: colors.text }}>
-          {state.isRecording ? "Recording…" : "Tap to record a voice note"}
+          {state.isRecording ? t("voice.recording") : t("voice.tapToRecord")}
         </Text>
         <Text weight="body" style={{ color: colors.textMuted, fontSize: 13 }}>
-          {state.isRecording ? `${fmt(seconds)} / 1:00` : "Up to 1 minute"}
+          {state.isRecording ? `${fmt(seconds)} / 1:00` : t("voice.upTo")}
         </Text>
       </View>
     </View>

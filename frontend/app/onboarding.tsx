@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Share, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Share } from "react-native";
 import { TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/auth";
+import { useI18n } from "@/src/i18n";
 import { api } from "@/src/api";
 import { Text, Button, Card } from "@/src/components/ui";
 import { colors, fonts, spacing, radius } from "@/src/theme";
@@ -14,26 +15,26 @@ export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { refresh, signOut } = useAuth();
+  const { t } = useI18n();
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // poll couple status while waiting for partner to join
   useEffect(() => {
     if (mode !== "create") return;
-    const t = setInterval(async () => {
+    const tmr = setInterval(async () => {
       try {
         const c = await api.get("/couple");
         if (c.is_linked) {
-          clearInterval(t);
+          clearInterval(tmr);
           await refresh();
           router.replace("/(tabs)");
         }
       } catch {}
     }, 4000);
-    return () => clearInterval(t);
+    return () => clearInterval(tmr);
   }, [mode, refresh, router]);
 
   const createCouple = async () => {
@@ -52,7 +53,7 @@ export default function Onboarding() {
 
   const joinCouple = async () => {
     if (codeInput.trim().length < 4) {
-      setError("Enter the 6-character code your partner shared.");
+      setError(t("onb.errCode"));
       return;
     }
     setBusy(true);
@@ -71,9 +72,7 @@ export default function Onboarding() {
   const shareCode = async () => {
     if (!inviteCode) return;
     try {
-      await Share.share({
-        message: `Join me on Daily Dose of Me 💕 Use my invite code: ${inviteCode}`,
-      });
+      await Share.share({ message: t("onb.shareMsg", { code: inviteCode }) });
     } catch {}
   };
 
@@ -91,11 +90,10 @@ export default function Onboarding() {
         <Ionicons name="heart-circle" size={56} color={colors.primary} />
       </View>
       <Text weight="heading" style={styles.title}>
-        Link with your{"\n"}other half
+        {t("onb.title")}
       </Text>
       <Text weight="body" style={styles.subtitle}>
-        This space is just for the two of you. Create a code to invite your partner, or
-        enter the code they sent you.
+        {t("onb.subtitle")}
       </Text>
 
       {error ? (
@@ -107,42 +105,42 @@ export default function Onboarding() {
       {mode === "create" && inviteCode ? (
         <Card style={{ marginTop: spacing.xl, alignItems: "center" }}>
           <Text weight="caption" style={styles.codeLabel}>
-            YOUR INVITE CODE
+            {t("onb.yourCode")}
           </Text>
           <Text weight="heading" style={styles.code} testID="invite-code">
             {inviteCode}
           </Text>
-          <Button title="Share invite" onPress={shareCode} testID="share-code-btn" icon={<Ionicons name="share-social" size={18} color="#fff" />} style={{ marginTop: spacing.md, alignSelf: "stretch" }} />
+          <Button title={t("onb.share")} onPress={shareCode} testID="share-code-btn" icon={<Ionicons name="share-social" size={18} color="#fff" />} style={{ marginTop: spacing.md, alignSelf: "stretch" }} />
           <View style={styles.waiting}>
             <Ionicons name="time-outline" size={16} color={colors.textMuted} />
             <Text weight="body" style={styles.waitingText}>
-              Waiting for your partner to join…
+              {t("onb.waiting")}
             </Text>
           </View>
-          <Button title="Enter the app" variant="ghost" onPress={() => router.replace("/(tabs)")} testID="enter-app-btn" />
+          <Button title={t("onb.enterApp")} variant="ghost" onPress={() => router.replace("/(tabs)")} testID="enter-app-btn" />
         </Card>
       ) : mode === "join" ? (
         <Card style={{ marginTop: spacing.xl }}>
           <Text weight="caption" style={styles.codeLabel}>
-            ENTER INVITE CODE
+            {t("onb.enterCode")}
           </Text>
           <TextInput
             value={codeInput}
-            onChangeText={(t) => setCodeInput(t.toUpperCase())}
-            placeholder="e.g. AB12CD"
+            onChangeText={(tx) => setCodeInput(tx.toUpperCase())}
+            placeholder={t("onb.codePlaceholder")}
             placeholderTextColor={colors.textMuted}
             autoCapitalize="characters"
             maxLength={6}
             style={styles.input}
             testID="join-code-input"
           />
-          <Button title="Link us together" onPress={joinCouple} loading={busy} testID="join-couple-btn" style={{ marginTop: spacing.md }} />
-          <Button title="Back" variant="ghost" onPress={() => { setMode("choose"); setError(""); }} />
+          <Button title={t("onb.linkUs")} onPress={joinCouple} loading={busy} testID="join-couple-btn" style={{ marginTop: spacing.md }} />
+          <Button title={t("common.back")} variant="ghost" onPress={() => { setMode("choose"); setError(""); }} />
         </Card>
       ) : (
         <View style={{ marginTop: spacing.xl, gap: spacing.md }}>
-          <Button title="Create an invite code" onPress={createCouple} loading={busy} testID="create-couple-btn" icon={<Ionicons name="add-circle" size={20} color="#fff" />} />
-          <Button title="I have an invite code" variant="outline" onPress={() => { setMode("join"); setError(""); }} testID="goto-join-btn" />
+          <Button title={t("onb.createCode")} onPress={createCouple} loading={busy} testID="create-couple-btn" icon={<Ionicons name="add-circle" size={20} color="#fff" />} />
+          <Button title={t("onb.haveCode")} variant="outline" onPress={() => { setMode("join"); setError(""); }} testID="goto-join-btn" />
         </View>
       )}
     </KeyboardAwareScrollView>

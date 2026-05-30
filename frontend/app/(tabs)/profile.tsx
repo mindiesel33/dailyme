@@ -1,19 +1,20 @@
 import React, { useCallback, useState } from "react";
 import { View, StyleSheet, Image, TouchableOpacity, TextInput, Alert, Share } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { useI18n, Lang } from "@/src/i18n";
 import { Text, Button, Card } from "@/src/components/ui";
 import { colors, fonts, spacing, radius } from "@/src/theme";
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { user, signOut } = useAuth();
+  const { t, lang, setLang } = useI18n();
   const [couple, setCouple] = useState<any>(null);
   const [editAnni, setEditAnni] = useState(false);
   const [anniInput, setAnniInput] = useState("");
@@ -42,7 +43,7 @@ export default function Profile() {
 
   const saveAnni = async () => {
     if (!dayjs(anniInput, "YYYY-MM-DD", true).isValid()) {
-      Alert.alert("Invalid date", "Use the format YYYY-MM-DD, e.g. 2023-06-15.");
+      Alert.alert(t("prof.invalidDate"), t("prof.invalidDateMsg"));
       return;
     }
     setBusy(true);
@@ -51,7 +52,7 @@ export default function Profile() {
       setEditAnni(false);
       load();
     } catch (e: any) {
-      Alert.alert("Couldn't save", e.message);
+      Alert.alert(t("prof.couldntSave"), e.message);
     } finally {
       setBusy(false);
     }
@@ -59,8 +60,13 @@ export default function Profile() {
 
   const shareCode = async () => {
     if (!couple?.invite_code) return;
-    await Share.share({ message: `Join me on Daily Dose of Me 💕 Invite code: ${couple.invite_code}` });
+    await Share.share({ message: t("onb.shareMsg", { code: couple.invite_code }) });
   };
+
+  const LANGS: { key: Lang; label: string }[] = [
+    { key: "en", label: "English" },
+    { key: "es", label: "Español (México)" },
+  ];
 
   return (
     <KeyboardAwareScrollView
@@ -70,48 +76,45 @@ export default function Profile() {
       showsVerticalScrollIndicator={false}
     >
       <Text weight="heading" style={styles.title}>
-        Us
+        {t("prof.us")}
       </Text>
 
-      {/* Couple header */}
       <Card style={[styles.card, { alignItems: "center" }]}>
         <View style={styles.avatarsRow}>
-          <Avatar member={me} fallback="You" />
+          <Avatar member={me} fallback={t("common.you")} />
           <View style={styles.heartBetween}>
             <Ionicons name="heart" size={24} color={colors.primary} />
           </View>
-          <Avatar member={partner} fallback="Partner" />
+          <Avatar member={partner} fallback={t("common.partner")} />
         </View>
         {couple?.days_together != null ? (
           <Text weight="body" style={styles.togetherText}>
-            Together for <Text weight="bodyBold" style={{ color: colors.primary }}>{couple.days_together}</Text> days
+            {t("prof.togetherFor", { n: couple.days_together })}
           </Text>
         ) : (
           <Text weight="body" style={styles.togetherText}>
-            Set your anniversary below 💕
+            {t("prof.setAnniBelow")}
           </Text>
         )}
       </Card>
 
-      {/* Partner not linked */}
       {couple && !couple.is_linked && (
         <Card style={[styles.card, { backgroundColor: colors.primaryLight, borderColor: colors.secondary }]}>
           <Text weight="bodyBold" style={{ color: colors.primaryDark, fontSize: 16 }}>
-            Waiting for your partner
+            {t("prof.waitingPartner")}
           </Text>
           <Text weight="body" style={{ color: colors.primaryDark, marginTop: 4 }}>
-            Share your invite code so they can join.
+            {t("prof.shareCodeSub")}
           </Text>
           <Text weight="heading" style={styles.inviteCode} testID="profile-invite-code">
             {couple.invite_code}
           </Text>
-          <Button title="Share invite" onPress={shareCode} testID="profile-share-btn" icon={<Ionicons name="share-social" size={18} color="#fff" />} />
+          <Button title={t("onb.share")} onPress={shareCode} testID="profile-share-btn" icon={<Ionicons name="share-social" size={18} color="#fff" />} />
         </Card>
       )}
 
-      {/* Leaderboard */}
       <Text weight="headingSemi" style={styles.section}>
-        Leaderboard
+        {t("prof.leaderboard")}
       </Text>
       <Card style={styles.card}>
         {members.map((m: any) => {
@@ -126,8 +129,8 @@ export default function Profile() {
                 </View>
               )}
               <Text weight="bodySemi" style={styles.lbName}>
-                {m.name?.split(" ")[0] || "Partner"}
-                {m.user_id === user?.user_id ? " (you)" : ""}
+                {m.name?.split(" ")[0] || t("common.partner")}
+                {m.user_id === user?.user_id ? t("prof.youSuffix") : ""}
               </Text>
               {isLeader && <Ionicons name="trophy" size={16} color={colors.sunshine} />}
               <Text weight="bodyBold" style={styles.lbPoints}>
@@ -138,14 +141,13 @@ export default function Profile() {
         })}
         {members.length < 2 && (
           <Text weight="body" style={{ color: colors.textMuted, fontSize: 13, textAlign: "center", marginTop: 4 }}>
-            Scores show up once your partner joins.
+            {t("prof.scoresAfterJoin")}
           </Text>
         )}
       </Card>
 
-      {/* Anniversary */}
       <Text weight="headingSemi" style={styles.section}>
-        Anniversary
+        {t("prof.anniversary")}
       </Text>
       <Card style={styles.card}>
         {editAnni ? (
@@ -159,24 +161,47 @@ export default function Profile() {
               testID="anniversary-input"
             />
             <View style={styles.rowGap}>
-              <Button title="Save" onPress={saveAnni} loading={busy} testID="save-anniversary-btn" style={{ flex: 1 }} />
-              <Button title="Cancel" variant="outline" onPress={() => setEditAnni(false)} style={{ flex: 1 }} />
+              <Button title={t("prof.save")} onPress={saveAnni} loading={busy} testID="save-anniversary-btn" style={{ flex: 1 }} />
+              <Button title={t("common.cancel")} variant="outline" onPress={() => setEditAnni(false)} style={{ flex: 1 }} />
             </View>
           </View>
         ) : (
           <TouchableOpacity style={styles.settingRow} onPress={() => setEditAnni(true)} testID="edit-anniversary-btn">
             <Ionicons name="calendar-outline" size={20} color={colors.primary} />
             <Text weight="body" style={styles.settingText}>
-              {couple?.anniversary_date ? dayjs(couple.anniversary_date).format("MMMM D, YYYY") : "When did it all begin?"}
+              {couple?.anniversary_date ? dayjs(couple.anniversary_date).format("MMMM D, YYYY") : t("prof.whenBegin")}
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </Card>
 
-      {/* Account */}
       <Text weight="headingSemi" style={styles.section}>
-        Account
+        {t("prof.language")}
+      </Text>
+      <Card style={styles.card}>
+        <View style={styles.segment}>
+          {LANGS.map((l) => {
+            const active = lang === l.key;
+            return (
+              <TouchableOpacity
+                key={l.key}
+                style={[styles.segmentBtn, active && styles.segmentActive]}
+                onPress={() => setLang(l.key)}
+                testID={`lang-${l.key}`}
+                activeOpacity={0.8}
+              >
+                <Text weight={active ? "bodyBold" : "body"} style={[styles.segmentText, active && { color: "#fff" }]}>
+                  {l.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Card>
+
+      <Text weight="headingSemi" style={styles.section}>
+        {t("prof.account")}
       </Text>
       <Card style={styles.card}>
         <View style={styles.settingRow}>
@@ -189,7 +214,7 @@ export default function Profile() {
         <TouchableOpacity style={styles.settingRow} onPress={signOut} testID="logout-btn">
           <Ionicons name="log-out-outline" size={20} color={colors.primaryDark} />
           <Text weight="bodySemi" style={[styles.settingText, { color: colors.primaryDark }]}>
-            Sign out
+            {t("prof.signOut")}
           </Text>
         </TouchableOpacity>
       </Card>
@@ -238,4 +263,8 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
   dateInput: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontFamily: fonts.body, color: colors.text, marginBottom: spacing.sm, textAlign: "center", letterSpacing: 1 },
   rowGap: { flexDirection: "row", gap: 8 },
+  segment: { flexDirection: "row", backgroundColor: colors.background, borderRadius: radius.md, padding: 4, gap: 4 },
+  segmentBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.sm, alignItems: "center" },
+  segmentActive: { backgroundColor: colors.primary },
+  segmentText: { fontSize: 14, color: colors.textSecondary },
 });

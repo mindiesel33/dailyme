@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/src/auth";
+import { useI18n } from "@/src/i18n";
 import { Text, Button } from "@/src/components/ui";
 import { colors, fonts, spacing } from "@/src/theme";
 
@@ -45,12 +46,13 @@ export default function Login() {
 
 function Content({ busy, onSignIn }: { busy: boolean; onSignIn: () => void }) {
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   return (
     <View style={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
       <View style={styles.badge}>
         <Ionicons name="heart" size={16} color={colors.primary} />
         <Text weight="bodySemi" style={styles.badgeText}>
-          just the two of us
+          {t("login.badge")}
         </Text>
       </View>
 
@@ -58,12 +60,11 @@ function Content({ busy, onSignIn }: { busy: boolean; onSignIn: () => void }) {
         Daily Dose{"\n"}of Me
       </Text>
       <Text weight="body" style={styles.subtitle}>
-        Your private little world — date nights, voice notes, playful challenges, and
-        the small moments that make us, us.
+        {t("login.subtitle")}
       </Text>
 
       <Button
-        title="Continue with Google"
+        title={t("login.google")}
         onPress={onSignIn}
         loading={busy}
         testID="google-signin-btn"
@@ -71,7 +72,7 @@ function Content({ busy, onSignIn }: { busy: boolean; onSignIn: () => void }) {
         style={{ marginTop: spacing.lg }}
       />
       <Text weight="body" style={styles.terms}>
-        Sign in to link with your partner using an invite code.
+        {t("login.terms")}
       </Text>
     </View>
   );
