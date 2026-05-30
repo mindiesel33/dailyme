@@ -10,6 +10,7 @@ lighthearted daily/weekly games together.
 - AI: DeepSeek V4 Flash via OpenRouter (`deepseek/deepseek-v4-flash`) for daily trivia + weekly challenge generation
 - Media: device photo library + camera (expo-image-picker, base64); voice notes (expo-audio, up to 60s)
 - Fonts: Outfit (headings) + Nunito (body); soft premium pink theme
+- **Bilingual (English + Mexican Spanish)**: auto-detect device locale via expo-localization, manual toggle in Profile (independent per person, persisted locally via `ddom_lang`). UI catalog in `src/i18n.tsx`; AI/question content localized server-side (parallel ES question bank, bilingual trivia generation stored as `question_en/_es`+`options_en/_es`, challenges generated in chosen language). API routes accept a `lang` query/body param.
 
 ## Core Features
 1. **Couple linking** — Google login → create an invite code or join with a partner's code.
