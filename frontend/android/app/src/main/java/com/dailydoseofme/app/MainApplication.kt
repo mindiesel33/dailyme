@@ -1,4 +1,4 @@
-package com.cwireless27.frontend
+package com.dailydoseofme.app
 
 import android.app.Application
 import android.content.res.Configuration

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Daily Dose of Me",
-    "slug": "frontend",
+    "slug": "dailydoseofme",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,6 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSCameraUsageDescription": "Capture date-night photos for your memories",
         "NSPhotoLibraryUsageDescription": "Add photos from your gallery to memories",
@@ -22,6 +23,7 @@
         "backgroundColor": "#F58292"
       },
       "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -29,7 +31,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "package": "com.cwireless27.frontend"
+      "package": "com.dailydoseofme.app"
     },
     "web": {
       "bundler": "metro",
