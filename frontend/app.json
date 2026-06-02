@@ -14,8 +14,10 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Capture date-night photos for your memories",
         "NSPhotoLibraryUsageDescription": "Add photos from your gallery to memories",
-        "NSMicrophoneUsageDescription": "Record voice notes for your memories"
-      }
+        "NSMicrophoneUsageDescription": "Record voice notes for your memories",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.dailydoseofme.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -59,7 +61,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4a3372b6-36f8-4380-8071-5673e8e53f9b"
+        "projectId": "328d612b-c52e-4bf9-b1f7-3b68d689eb44"
       }
     }
   }
