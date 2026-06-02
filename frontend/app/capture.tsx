@@ -11,6 +11,7 @@ import { useI18n } from "@/src/i18n";
 import { Text, Button } from "@/src/components/ui";
 import { VoiceRecorder } from "@/src/components/voice";
 import { colors, fonts, spacing, radius } from "@/src/theme";
+import { GooglePhotosPicker } from "@/src/components/GooglePhotosPicker";
 
 const MAX_PHOTOS = 5;
 const MAX_CAPTION = 1500;
@@ -24,6 +25,7 @@ export default function Capture() {
 
   const [date, setDate] = useState(initialDate);
   const [media, setMedia] = useState<string[]>([]);
+  const [googlePickerVisible, setGooglePickerVisible] = useState(false);
   const [caption, setCaption] = useState("");
   const [voice, setVoice] = useState<{ uri: string | null; dur: number }>({ uri: null, dur: 0 });
   const [saving, setSaving] = useState(false);
@@ -172,6 +174,12 @@ export default function Capture() {
                   {t("cap.library")}
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.addPhoto} onPress={() => setGooglePickerVisible(true)} testID="google-photos-btn">
+                <Ionicons name="logo-google" size={24} color={colors.primary} />
+                <Text weight="body" style={styles.addPhotoText}>
+                  Google Photos
+                </Text>
+              </TouchableOpacity>
               {Platform.OS !== "web" && (
                 <TouchableOpacity style={styles.addPhoto} onPress={takePhoto} testID="take-photo-btn">
                   <Ionicons name="camera-outline" size={24} color={colors.primary} />
@@ -204,6 +212,15 @@ export default function Capture() {
 
         <Button title={t("cap.save")} onPress={save} loading={saving} testID="save-memory-btn" style={{ marginTop: spacing.xl }} />
       </KeyboardAwareScrollView>
+
+      <GooglePhotosPicker
+        visible={googlePickerVisible}
+        onClose={() => setGooglePickerVisible(false)}
+        onImport={(base64Images) => {
+          setMedia((prev) => [...prev, ...base64Images].slice(0, MAX_PHOTOS));
+        }}
+        maxSelection={MAX_PHOTOS - media.length}
+      />
     </View>
   );
 }

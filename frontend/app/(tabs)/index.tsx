@@ -11,7 +11,7 @@ import { Text } from "@/src/components/ui";
 import { colors, fonts, spacing, radius, shadow } from "@/src/theme";
 
 const { width } = Dimensions.get("window");
-const CELL = (width - spacing.lg * 2 - 12) / 7;
+const CELL = (width - spacing.lg * 2 - spacing.md * 2 - 4) / 7;
 
 type Member = { user_id: string; name?: string; picture?: string; points: number };
 type Memory = { id: string; date: string; media: string[]; caption: string; voice_note?: string; author_name?: string };

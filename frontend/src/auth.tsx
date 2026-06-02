@@ -24,13 +24,11 @@ type AuthState = {
 const AuthContext = createContext<AuthState>({} as AuthState);
 export const useAuth = () => useContext(AuthContext);
 
-const AUTH_URL = "https://auth.emergentagent.com/";
-
-function parseSessionId(url: string): string | null {
+function parseAccessToken(url: string): string | null {
   if (!url) return null;
-  const hashMatch = url.match(/[#&]session_id=([^&]+)/);
+  const hashMatch = url.match(/[#&]access_token=([^&]+)/);
   if (hashMatch) return decodeURIComponent(hashMatch[1]);
-  const queryMatch = url.match(/[?&]session_id=([^&]+)/);
+  const queryMatch = url.match(/[?&]access_token=([^&]+)/);
   if (queryMatch) return decodeURIComponent(queryMatch[1]);
   return null;
 }
@@ -61,30 +59,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const processSessionId = useCallback(async (sessionId: string) => {
+  const processGoogleToken = useCallback(async (accessToken: string) => {
     setLoading(true);
     try {
-      const res = await api.post("/auth/session", { session_id: sessionId });
+      const res = await api.post("/auth/session", { access_token: accessToken });
       await storage.secureSet(TOKEN_KEY, res.session_token);
       setUser(res.user);
       // fetch couple status
       const me = await api.get("/auth/me");
       setHasCouple(me.has_couple);
     } catch (e) {
-      console.log("processSessionId error", e);
+      console.log("processGoogleToken error", e);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Web: detect session_id in URL on mount
+  // Web: detect access_token in URL on mount
   useEffect(() => {
     if (Platform.OS === "web") {
       const href = window.location.hash || window.location.search;
-      const sid = parseSessionId(href);
-      if (sid) {
+      const token = parseAccessToken(href);
+      if (token) {
         window.history.replaceState(null, "", window.location.pathname);
-        processSessionId(sid);
+        storage.secureSet("google_photos_access_token", token).then(() => {
+          processGoogleToken(token);
+        });
         return;
       }
     }
@@ -97,38 +97,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (Platform.OS === "web") return;
     Linking.getInitialURL().then((url) => {
       if (url) {
-        const sid = parseSessionId(url);
-        if (sid) processSessionId(sid);
+        const token = parseAccessToken(url);
+        if (token) {
+          storage.secureSet("google_photos_access_token", token).then(() => {
+            processGoogleToken(token);
+          });
+        }
       }
     });
     const sub = Linking.addEventListener("url", ({ url }) => {
-      const sid = parseSessionId(url);
-      if (sid) processSessionId(sid);
+      const token = parseAccessToken(url);
+      if (token) {
+        storage.secureSet("google_photos_access_token", token).then(() => {
+          processGoogleToken(token);
+        });
+      }
     });
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signIn = useCallback(async () => {
-    if (Platform.OS === "web") {
-      const redirectUrl = window.location.origin + "/";
-      window.location.href = `${AUTH_URL}?redirect=${encodeURIComponent(redirectUrl)}`;
+    const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert("Missing Client ID. Please configure EXPO_PUBLIC_GOOGLE_CLIENT_ID in your env file.");
       return;
     }
-    const redirectUrl = Linking.createURL("auth");
-    const authUrl = `${AUTH_URL}?redirect=${encodeURIComponent(redirectUrl)}`;
+    const redirectUrl = Platform.OS === "web"
+      ? window.location.origin + "/"
+      : Linking.createURL("auth");
+
+    const scope = "openid email profile https://www.googleapis.com/auth/photoslibrary.readonly";
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth` +
+      `?response_type=token` +
+      `&client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUrl)}` +
+      `&scope=${encodeURIComponent(scope)}` +
+      `&prompt=consent`;
+
+    if (Platform.OS === "web") {
+      window.location.href = authUrl;
+      return;
+    }
     const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
     if (result.type === "success" && result.url) {
-      const sid = parseSessionId(result.url);
-      if (sid) await processSessionId(sid);
+      const token = parseAccessToken(result.url);
+      if (token) {
+        await storage.secureSet("google_photos_access_token", token);
+        await processGoogleToken(token);
+      }
     }
-  }, [processSessionId]);
+  }, [processGoogleToken]);
 
   const signOut = useCallback(async () => {
     try {
       await api.post("/auth/logout");
     } catch {}
     await storage.secureRemove(TOKEN_KEY);
+    await storage.secureRemove("google_photos_access_token");
     setUser(null);
     setHasCouple(false);
   }, []);

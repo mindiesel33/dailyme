@@ -126,7 +126,7 @@ def extract_json(text: str) -> Optional[Any]:
 # ----------------------------- Models ----------------------------------------
 
 class SessionRequest(BaseModel):
-    session_id: str
+    access_token: str
 
 
 class JoinCoupleRequest(BaseModel):
@@ -197,22 +197,24 @@ def require_couple(couple: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 @api_router.post("/auth/session")
 async def auth_session(req: SessionRequest):
-    # Exchange session_id for session data via Emergent
+    # Verify the access token directly with Google UserInfo API
     try:
         async with httpx.AsyncClient(timeout=30.0) as http:
-            resp = await http.get(EMERGENT_SESSION_API, headers={"X-Session-ID": req.session_id})
+            resp = await http.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {req.access_token}"}
+            )
             resp.raise_for_status()
             data = resp.json()
     except Exception as e:
-        logger.error(f"Session exchange failed: {e}")
-        raise HTTPException(status_code=401, detail="Failed to verify session")
+        logger.error(f"Google Token verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid Google Access Token")
 
     email = data.get("email")
     name = data.get("name")
     picture = data.get("picture")
-    session_token = data.get("session_token")
-    if not email or not session_token:
-        raise HTTPException(status_code=401, detail="Invalid session data")
+    if not email:
+        raise HTTPException(status_code=401, detail="Email not provided by Google")
 
     existing = await db.users.find_one({"email": email}, {"_id": 0})
     if existing:
@@ -228,6 +230,7 @@ async def auth_session(req: SessionRequest):
             "created_at": now_utc(),
         })
 
+    session_token = secrets.token_hex(32)
     await db.user_sessions.update_one(
         {"session_token": session_token},
         {"$set": {
@@ -240,6 +243,7 @@ async def auth_session(req: SessionRequest):
     )
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
     return {"session_token": session_token, "user": user}
+
 
 
 @api_router.get("/auth/me")
