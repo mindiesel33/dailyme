@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Image,
-  FlatList,
+  ScrollView,
   ActivityIndicator,
-  TextInput,
   Modal,
   Alert,
   Dimensions,
@@ -14,9 +13,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
 import { Text, Button } from "@/src/components/ui";
-import { colors, fonts, spacing, radius, shadow } from "@/src/theme";
+import { colors, fonts, spacing, radius } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 import { useAuth } from "@/src/auth";
 
@@ -30,23 +28,24 @@ interface GooglePhotosPickerProps {
   maxSelection: number;
 }
 
-interface MediaItem {
+interface PickedItem {
   id: string;
   baseUrl: string;
   filename: string;
 }
 
 const STORAGE_TOKEN_KEY = "google_photos_access_token";
+const PICKER_BASE = "https://photospicker.googleapis.com/v1";
 
-// Helper to convert remote image URL to base64 Data URI
-const urlToBase64 = async (url: string): Promise<string> => {
-  const response = await fetch(url);
+// Convert a remote image URL to a base64 Data URI.
+const urlToBase64 = async (url: string, accessToken: string): Promise<string> => {
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   const blob = await response.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => {
-      resolve(reader.result as string);
-    };
+    reader.onloadend = () => resolve(reader.result as string);
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
@@ -58,144 +57,208 @@ export function GooglePhotosPicker({
   onImport,
   maxSelection,
 }: GooglePhotosPickerProps) {
+  const { signIn } = useAuth();
   const [token, setToken] = useState<string>("");
-  const [manualToken, setManualToken] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [importing, setImporting] = useState<boolean>(false);
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [status, setStatus] = useState<
+    "idle" | "creating" | "awaiting" | "fetching" | "importing"
+  >("idle");
+  const [pickedItems, setPickedItems] = useState<PickedItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [showTokenInput, setShowTokenInput] = useState<boolean>(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRef = useRef<boolean>(false);
 
-  // Load saved token on mount
+  // Load saved token whenever the modal opens.
   useEffect(() => {
-    if (visible) {
-      storage.secureGet<string>(STORAGE_TOKEN_KEY, "").then((savedToken) => {
-        if (savedToken) {
-          setToken(savedToken);
-          fetchPhotos(savedToken);
-        }
-      });
-    }
+    if (!visible) return;
+    cancelledRef.current = false;
+    storage.secureGet<string>(STORAGE_TOKEN_KEY, "").then((saved) => {
+      if (saved) setToken(saved);
+    });
+    return () => {
+      cancelledRef.current = true;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      sessionIdRef.current = null;
+    };
   }, [visible]);
 
-  const fetchPhotos = async (accessToken: string, loadMoreToken: string | null = null) => {
-    setLoading(true);
-    try {
-      let url = "https://photoslibrary.googleapis.com/v1/mediaItems?pageSize=60";
-      if (loadMoreToken) {
-        url += `&pageToken=${loadMoreToken}`;
-      }
+  const reset = useCallback(() => {
+    setPickedItems([]);
+    setSelectedIds([]);
+    setStatus("idle");
+    sessionIdRef.current = null;
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+  }, []);
 
-      const res = await fetch(url, {
+  const handleClose = useCallback(() => {
+    cancelledRef.current = true;
+    reset();
+    onClose();
+  }, [onClose, reset]);
+
+  const handleSignOutAndReconnect = useCallback(async () => {
+    onClose();
+    await signIn();
+  }, [onClose, signIn]);
+
+  // Fetch the list of items the user picked in the Google-hosted UI.
+  const fetchPickedItems = useCallback(
+    async (sessionId: string, accessToken: string) => {
+      setStatus("fetching");
+      try {
+        const res = await fetch(
+          `${PICKER_BASE}/mediaItems?sessionId=${encodeURIComponent(sessionId)}&pageSize=${maxSelection}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!res.ok) {
+          if (res.status === 401) {
+            await storage.secureRemove(STORAGE_TOKEN_KEY);
+            setToken("");
+            Alert.alert("Session Expired", "Please sign in again to reconnect Google Photos.");
+            setStatus("idle");
+            return;
+          }
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || "Failed to fetch picked items");
+        }
+        const data = await res.json();
+        const items: PickedItem[] = (data.mediaItems || []).map((item: any) => ({
+          id: item.id,
+          baseUrl: item.mediaFile?.baseUrl ?? "",
+          filename: item.mediaFile?.filename ?? "",
+        }));
+        setPickedItems(items);
+        setSelectedIds(items.map((i) => i.id)); // pre-select everything the user picked
+        setStatus("idle");
+      } catch (err: any) {
+        Alert.alert("Google Photos Error", err.message || "Could not retrieve picked items");
+        setStatus("idle");
+      }
+    },
+    [maxSelection]
+  );
+
+  // Poll session status until the user finishes picking in Google's UI.
+  const pollSession = useCallback(
+    (sessionId: string, accessToken: string, intervalMs: number) => {
+      const tick = async () => {
+        if (cancelledRef.current || sessionIdRef.current !== sessionId) return;
+        try {
+          const res = await fetch(`${PICKER_BASE}/sessions/${sessionId}`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!res.ok) {
+            if (res.status === 401) {
+              await storage.secureRemove(STORAGE_TOKEN_KEY);
+              setToken("");
+              Alert.alert("Session Expired", "Please sign in again.");
+              setStatus("idle");
+              return;
+            }
+            throw new Error("Session polling failed");
+          }
+          const data = await res.json();
+          if (data.mediaItemsSet) {
+            await fetchPickedItems(sessionId, accessToken);
+            return;
+          }
+          const nextInterval =
+            parsePollIntervalMs(data?.pollingConfig?.pollInterval) || intervalMs;
+          pollTimerRef.current = setTimeout(tick, nextInterval);
+        } catch (err: any) {
+          // transient errors → keep polling at the same cadence
+          pollTimerRef.current = setTimeout(tick, intervalMs);
+        }
+      };
+      pollTimerRef.current = setTimeout(tick, intervalMs);
+    },
+    [fetchPickedItems]
+  );
+
+  const openPicker = useCallback(async () => {
+    if (!token) return;
+    setStatus("creating");
+    try {
+      // 1. Create a picker session.
+      const createRes = await fetch(`${PICKER_BASE}/sessions`, {
+        method: "POST",
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({}),
       });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          // Token expired or invalid
+      if (!createRes.ok) {
+        if (createRes.status === 401) {
           await storage.secureRemove(STORAGE_TOKEN_KEY);
           setToken("");
-          Alert.alert("Session Expired", "Please reconnect your Google account.");
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData?.error?.message || "Failed to fetch photos");
+          Alert.alert("Session Expired", "Please sign in again.");
+          setStatus("idle");
+          return;
         }
-        return;
+        const errData = await createRes.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || "Failed to start picker session");
       }
+      const session = await createRes.json();
+      sessionIdRef.current = session.id;
+      const pickerUri: string = session.pickerUri;
+      const pollMs = parsePollIntervalMs(session?.pollingConfig?.pollInterval) || 3000;
 
-      const data = await res.json();
-      const items = (data.mediaItems || []).map((item: any) => ({
-        id: item.id,
-        baseUrl: item.baseUrl,
-        filename: item.filename,
-      }));
-
-      if (loadMoreToken) {
-        setMediaItems((prev) => [...prev, ...items]);
+      // 2. Open Google-hosted picker UI.
+      setStatus("awaiting");
+      if (Platform.OS === "web") {
+        window.open(pickerUri, "_blank");
       } else {
-        setMediaItems(items);
+        await WebBrowser.openBrowserAsync(pickerUri);
       }
-      setNextPageToken(data.nextPageToken || null);
+
+      // 3. Poll until the user finishes picking.
+      pollSession(session.id, token, pollMs);
     } catch (err: any) {
-      Alert.alert("Google Photos Error", err.message || "Could not retrieve photos");
-    } finally {
-      setLoading(false);
+      Alert.alert("Picker Error", err.message || "Could not open Google Photos picker");
+      setStatus("idle");
     }
-  };
+  }, [token, pollSession]);
 
-  const { signOut } = useAuth();
+  const toggleSelect = useCallback(
+    (id: string) => {
+      setSelectedIds((prev) => {
+        if (prev.includes(id)) return prev.filter((x) => x !== id);
+        if (prev.length >= maxSelection) {
+          Alert.alert("Limit Reached", `You can only import up to ${maxSelection} photos.`);
+          return prev;
+        }
+        return [...prev, id];
+      });
+    },
+    [maxSelection]
+  );
 
-  const handleSignOutAndReconnect = async () => {
+  const handleImportSelected = useCallback(async () => {
+    if (selectedIds.length === 0 || !token) return;
+    setStatus("importing");
     try {
-      await signOut();
-      onClose();
-    } catch (err: any) {
-      Alert.alert("Sign Out Error", err.message || "Failed to sign out");
-    }
-  };
-
-  const handleManualTokenSubmit = async () => {
-    const trimmed = manualToken.trim();
-    if (!trimmed) return;
-    await storage.secureSet(STORAGE_TOKEN_KEY, trimmed);
-    setToken(trimmed);
-    setManualToken("");
-    fetchPhotos(trimmed);
-  };
-
-  const handleDisconnect = async () => {
-    await storage.secureRemove(STORAGE_TOKEN_KEY);
-    setToken("");
-    setMediaItems([]);
-    setSelectedIds([]);
-    setNextPageToken(null);
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((x) => x !== id);
-      }
-      if (prev.length >= maxSelection) {
-        Alert.alert("Limit Reached", `You can only select up to ${maxSelection} photos.`);
-        return prev;
-      }
-      return [...prev, id];
-    });
-  };
-
-  const handleImportSelected = async () => {
-    if (selectedIds.length === 0) return;
-    setImporting(true);
-    try {
-      const selectedItems = mediaItems.filter((item) => selectedIds.includes(item.id));
+      const chosen = pickedItems.filter((it) => selectedIds.includes(it.id));
       const base64s: string[] = [];
-
-      for (const item of selectedItems) {
-        // Fetch the photo with =w1024-h1024 constraint to download a reasonably sized file
-        const photoUrl = `${item.baseUrl}=w1024-h1024`;
-        const b64 = await urlToBase64(photoUrl);
+      for (const it of chosen) {
+        const url = `${it.baseUrl}=w1024-h1024`;
+        const b64 = await urlToBase64(url, token);
         base64s.push(b64);
       }
-
       onImport(base64s);
-      setSelectedIds([]);
+      reset();
       onClose();
     } catch (err: any) {
-      Alert.alert("Import Failed", "Could not convert Google Photos. Please try again.");
-    } finally {
-      setImporting(false);
+      Alert.alert("Import Failed", err.message || "Could not import selected photos.");
+      setStatus("idle");
     }
-  };
+  }, [selectedIds, pickedItems, token, onImport, onClose, reset]);
 
-  const renderPhotoItem = ({ item }: { item: MediaItem }) => {
+  const renderPhoto = (item: PickedItem) => {
     const isSelected = selectedIds.includes(item.id);
     return (
       <TouchableOpacity
+        key={item.id}
         style={styles.photoContainer}
         onPress={() => toggleSelect(item.id)}
         activeOpacity={0.8}
@@ -213,139 +276,123 @@ export function GooglePhotosPicker({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
       <View style={styles.root}>
-        {/* Header bar */}
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={10}>
+          <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={10}>
             <Ionicons name="close" size={26} color={colors.text} />
           </TouchableOpacity>
           <Text weight="headingSemi" style={styles.headerTitle}>
             Google Photos
           </Text>
-          {token ? (
-            <TouchableOpacity onPress={handleDisconnect} style={styles.disconnectBtn}>
-              <Text weight="bodySemi" style={styles.disconnectText}>
-                Disconnect
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 60 }} />
-          )}
+          <View style={{ width: 60 }} />
         </View>
 
         {/* Content */}
         {!token ? (
           <View style={styles.authContainer}>
-            <Ionicons name="logo-google" size={60} color={colors.primary} style={{ marginBottom: spacing.md }} />
+            <Ionicons
+              name="logo-google"
+              size={60}
+              color={colors.primary}
+              style={{ marginBottom: spacing.md }}
+            />
             <Text weight="headingMedium" style={styles.authTitle}>
               Google Photos Disconnected
             </Text>
             <Text weight="body" style={styles.authDesc}>
-              Permission to access your Google Photos library is missing or has expired. Please sign out and sign back in to grant permission.
+              Permission to access Google Photos is missing or has expired. Sign in again to grant
+              access.
             </Text>
-
             <Button
-              title="Sign Out to Reconnect"
+              title="Sign In to Reconnect"
               onPress={handleSignOutAndReconnect}
               icon={<Ionicons name="logo-google" size={20} color="#fff" />}
               style={{ width: "100%", marginTop: spacing.lg }}
             />
+          </View>
+        ) : pickedItems.length === 0 ? (
+          <View style={styles.authContainer}>
+            <Ionicons
+              name="images-outline"
+              size={60}
+              color={colors.primary}
+              style={{ marginBottom: spacing.md }}
+            />
+            <Text weight="headingMedium" style={styles.authTitle}>
+              Pick from Google Photos
+            </Text>
+            <Text weight="body" style={styles.authDesc}>
+              You'll be taken to Google to choose photos. Come back here when you're done — we'll
+              pick up automatically.
+            </Text>
 
-            <TouchableOpacity
-              onPress={() => setShowTokenInput(!showTokenInput)}
-              style={styles.toggleTokenBtn}
-            >
-              <Text weight="bodySemi" style={styles.toggleTokenText}>
-                {showTokenInput ? "Hide manual token option" : "Use manual Google Access Token"}
-              </Text>
-            </TouchableOpacity>
+            {status === "idle" && (
+              <Button
+                title={`Open Google Photos Picker`}
+                onPress={openPicker}
+                icon={<Ionicons name="open-outline" size={20} color="#fff" />}
+                style={{ width: "100%", marginTop: spacing.lg }}
+              />
+            )}
 
-            {showTokenInput && (
-              <View style={styles.tokenInputContainer}>
-                <TextInput
-                  value={manualToken}
-                  onChangeText={setManualToken}
-                  placeholder="Paste OAuth Access Token"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  secureTextEntry
-                  style={styles.tokenInput}
-                />
-                <Button
-                  title="Load Photos"
-                  onPress={handleManualTokenSubmit}
-                  disabled={!manualToken.trim()}
-                  style={{ marginTop: spacing.sm }}
-                />
-                <Text weight="body" style={styles.tokenHint}>
-                  Generate temporary tokens at developers.google.com/oauthplayground (select Photos Library API readonly scope).
+            {(status === "creating" ||
+              status === "awaiting" ||
+              status === "fetching") && (
+              <View style={{ marginTop: spacing.lg, alignItems: "center" }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text
+                  weight="body"
+                  style={{ marginTop: spacing.sm, color: colors.textSecondary, textAlign: "center" }}
+                >
+                  {status === "creating" && "Starting picker session..."}
+                  {status === "awaiting" && "Waiting for you to finish picking in Google Photos..."}
+                  {status === "fetching" && "Loading your selections..."}
                 </Text>
+                {status === "awaiting" && (
+                  <TouchableOpacity onPress={reset} style={{ marginTop: spacing.md }}>
+                    <Text weight="bodySemi" style={{ color: colors.primaryDark }}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
         ) : (
           <View style={{ flex: 1 }}>
-            {loading && mediaItems.length === 0 ? (
-              <View style={styles.center}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text weight="body" style={{ marginTop: spacing.sm, color: colors.textSecondary }}>
-                  Loading Google Photos...
-                </Text>
-              </View>
-            ) : (
-              <View style={{ flex: 1 }}>
-                <FlatList
-                  data={mediaItems}
-                  renderItem={renderPhotoItem}
-                  keyExtractor={(item) => item.id}
-                  numColumns={3}
-                  contentContainerStyle={styles.gridContainer}
-                  columnWrapperStyle={styles.gridRow}
-                  ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                      <Ionicons name="images-outline" size={48} color={colors.textMuted} />
-                      <Text weight="body" style={styles.emptyText}>
-                        No photos found in your Google Photos library.
-                      </Text>
-                    </View>
-                  }
-                  onEndReached={() => {
-                    if (nextPageToken && !loading) {
-                      fetchPhotos(token, nextPageToken);
-                    }
-                  }}
-                  onEndReachedThreshold={0.5}
-                  ListFooterComponent={
-                    loading ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={colors.primary}
-                        style={{ marginVertical: spacing.md }}
-                      />
-                    ) : null
-                  }
-                />
-
-                {/* Import floating bar */}
-                {selectedIds.length > 0 && (
-                  <View style={styles.importFooter}>
-                    <Button
-                      title={importing ? "Importing..." : `Import Selected (${selectedIds.length})`}
-                      onPress={handleImportSelected}
-                      loading={importing}
-                      style={{ flex: 1 }}
-                    />
-                  </View>
-                )}
-              </View>
-            )}
+            <ScrollView contentContainerStyle={styles.gridContainer}>
+              <View style={styles.gridWrap}>{pickedItems.map(renderPhoto)}</View>
+            </ScrollView>
+            <View style={styles.importFooter}>
+              <Button
+                title={
+                  status === "importing"
+                    ? "Importing..."
+                    : `Import Selected (${selectedIds.length})`
+                }
+                onPress={handleImportSelected}
+                loading={status === "importing"}
+                disabled={selectedIds.length === 0 || status === "importing"}
+                style={{ flex: 1 }}
+              />
+            </View>
           </View>
         )}
       </View>
     </Modal>
   );
+}
+
+// Google returns pollInterval as a duration string like "3s" or "0.500s".
+function parsePollIntervalMs(value: string | undefined): number | null {
+  if (!value) return null;
+  const m = value.match(/^([0-9]*\.?[0-9]+)s$/);
+  if (!m) return null;
+  const seconds = parseFloat(m[1]);
+  if (Number.isNaN(seconds)) return null;
+  return Math.max(1000, Math.round(seconds * 1000));
 }
 
 const styles = StyleSheet.create({
@@ -362,9 +409,6 @@ const styles = StyleSheet.create({
   },
   closeBtn: { width: 44, height: 44, justifyContent: "center", alignItems: "flex-start" },
   headerTitle: { fontSize: 18, color: colors.text },
-  disconnectBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: radius.sm, backgroundColor: colors.primaryLight },
-  disconnectText: { color: colors.primaryDark, fontSize: 13 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   authContainer: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -379,23 +423,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: spacing.lg,
   },
-  toggleTokenBtn: { marginTop: spacing.lg, paddingVertical: 10 },
-  toggleTokenText: { color: colors.primaryDark, fontSize: 14 },
-  tokenInputContainer: { width: "100%", marginTop: spacing.md, paddingHorizontal: spacing.xs },
-  tokenInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontFamily: fonts.body,
-    color: colors.text,
-  },
-  tokenHint: { fontSize: 12, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 16, textAlign: "center" },
   gridContainer: { padding: spacing.lg, paddingBottom: 100 },
-  gridRow: { gap: 10, marginBottom: 10 },
+  gridWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   photoContainer: {
     width: COLUMN_WIDTH,
     height: COLUMN_WIDTH,
@@ -421,8 +450,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 8 },
-  emptyText: { color: colors.textMuted, fontSize: 15, textAlign: "center", paddingHorizontal: spacing.xl },
   importFooter: {
     position: "absolute",
     bottom: 0,

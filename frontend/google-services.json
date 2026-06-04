@@ -14,11 +14,19 @@
       },
       "oauth_client": [
         {
-          "client_id": "1061980902663-e45rfluteiq132gr1b6tvmfu20u2oupc.apps.googleusercontent.com",
+          "client_id": "1061980902663-6phrmt8q4b62q22gh9c276ojgeau3mdj.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.dailydoseofme.app",
-            "certificate_hash": "11937a921999aa10f78cd40906c66ecc6b22aefb"
+            "certificate_hash": "509f8ae1f7b4efacc61c4003c52d7c5cc5e89bd1"
+          }
+        },
+        {
+          "client_id": "1061980902663-n6kpjiu88gpmas31tn2clncbvq2gjisq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dailydoseofme.app",
+            "certificate_hash": "a2c920fe9419390414ca4e6e4a1ed1caed90de80"
           }
         },
         {
@@ -37,6 +45,13 @@
             {
               "client_id": "1061980902663-nbi3e456cbo0phu2iugjt0igqkud9h32.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1061980902663-saucbg07vekg872pvc44r8l8mnssaecd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dailydoseofme.app"
+              }
             }
           ]
         }
