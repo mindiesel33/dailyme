@@ -24,6 +24,13 @@ type AuthState = {
   refresh: () => Promise<void>;
 };
 
+useEffect(() => {
+  if (Request) {
+    console.log("[auth] redirectUri:", Request.redirectUri);
+    console.log("[auth] clientId:", Request.clientId);
+  }
+}, [Request]);
+
 const AuthContext = createContext<AuthState>({} as AuthState);
 export const useAuth = () => useContext(AuthContext);
 
@@ -49,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Android uses the Android client (package + SHA-1 — no redirect URI needed).
   // iOS uses the iOS client with the reversed-client URL scheme from the plist.
   // Web uses the Web client with window.location.origin as the redirect.
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const [Request, response, promptAsync] = Google.useAuthRequest({
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
@@ -110,9 +117,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [response, processGoogleToken]);
 
   const signIn = useCallback(async () => {
-    if (!request) return;
+    if (!Request) return;
     await promptAsync();
-  }, [request, promptAsync]);
+  }, [Request, promptAsync]);
 
   const signOut = useCallback(async () => {
     try {
