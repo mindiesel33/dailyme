@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import * as Google from "expo-auth-session/providers/google";
 import { storage } from "@/src/utils/storage";
 import { api, TOKEN_KEY } from "@/src/api";
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [hasCouple, setHasCouple] = useState(false);
 
+  const redirectUrl = Linking.createURL("oauthredirect");
+
   // expo-auth-session routes to the correct OAuth client per platform.
   // Android uses the Android client (package + SHA-1 — no redirect URI needed).
   // iOS uses the iOS client with the reversed-client URL scheme from the plist.
@@ -54,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     scopes: GOOGLE_SCOPES,
+    redirectUrl: redirectUrl,
   });
 
   // TEMP debug — remove once auth works.
