@@ -48,27 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const redirectUrl = Linking.createURL("oauthredirect");
 
-  // expo-auth-session routes to the correct OAuth client per platform.
-  // Android uses the Android client (package + SHA-1 — no redirect URI needed).
-  // iOS uses the iOS client with the reversed-client URL scheme from the plist.
-  // Web uses the Web client with window.location.origin as the redirect.
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    scopes: GOOGLE_SCOPES,
-    redirectUrl: redirectUrl,
-  });
-
-  // TEMP debug — remove once auth works.
-  useEffect(() => {
-    if (request) {
-      console.log("[auth] platform:", Platform.OS);
-      console.log("[auth] redirectUri:", request.redirectUri);
-      console.log("[auth] clientId:", request.clientId);
-    }
-  }, [request]);
-
   const checkSession = useCallback(async () => {
     try {
       const token = await storage.secureGet<string>(TOKEN_KEY, "");
@@ -110,22 +89,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  // Handle the auth response from expo-auth-session.
-  useEffect(() => {
-    if (response?.type === "success") {
-      const accessToken = response.authentication?.accessToken;
-      if (accessToken) {
-        processGoogleToken(accessToken);
-      }
-    } else if (response?.type === "error") {
-      console.log("Google auth error", response.error);
-    }
-  }, [response, processGoogleToken]);
-
   const signIn = useCallback(async () => {
-    if (!request) return;
-    await promptAsync();
-  }, [request, promptAsync]);
+    const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    if (!webClientId) {
+      console.error("Google Web Client ID not set");
+      return;
+    }
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(webClientId)}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=token&scope=${encodeURIComponent(GOOGLE_SCOPES.join(" "))}`;
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+      if (result.type === "success") {
+        const url = result.url;
+        const match = url.match(/access_token=([^&]+)/);
+        if (match) {
+          const accessToken = decodeURIComponent(match[1]);
+          await processGoogleToken(accessToken);
+        }
+      } else if (result.type === "error") {
+        console.log("Auth cancelled or error");
+      }
+    } catch (e) {
+      console.log("signIn error", e);
+    }
+  }, [processGoogleToken, redirectUrl]);
 
   const signOut = useCallback(async () => {
     try {
