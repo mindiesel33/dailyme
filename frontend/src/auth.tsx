@@ -24,13 +24,6 @@ type AuthState = {
   refresh: () => Promise<void>;
 };
 
-useEffect(() => {
-  if (request) {
-    console.log("[auth] redirectUri:", request.redirectUri);
-    console.log("[auth] clientId:",    request.clientId);
-  }
-}, [request]);
-
 const AuthContext = createContext<AuthState>({} as AuthState);
 export const useAuth = () => useContext(AuthContext);
 
@@ -62,6 +55,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     scopes: GOOGLE_SCOPES,
   });
+
+  // TEMP debug — remove once auth works.
+  useEffect(() => {
+    if (request) {
+      console.log("[auth] platform:", Platform.OS);
+      console.log("[auth] redirectUri:", request.redirectUri);
+      console.log("[auth] clientId:", request.clientId);
+    }
+  }, [request]);
 
   const checkSession = useCallback(async () => {
     try {
